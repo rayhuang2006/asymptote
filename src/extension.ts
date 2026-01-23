@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { CphPanel } from './CphPanel';
 
 const Parser = require('web-tree-sitter');
 
@@ -20,11 +21,16 @@ export async function activate(context: vscode.ExtensionContext) {
             codelensProvider
         );
 
-        let disposable = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
+        let disposableRefresh = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
             codelensProvider.refresh();
         });
 
-        context.subscriptions.push(disposable);
+        let disposableRunner = vscode.commands.registerCommand('asymptote.showRunner', () => {
+            CphPanel.createOrShow(context.extensionUri);
+        });
+
+        context.subscriptions.push(disposableRefresh);
+        context.subscriptions.push(disposableRunner);
 
     } catch (error) {
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
@@ -72,6 +78,8 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                 );
 
                 const depth = this.calculateLoopDepth(funcBodyNode);
+                const signature = this.getStructureSignature(funcBodyNode);
+
                 let complexityText = "O(1)";
                 if (depth > 0) {
                     if (depth === 1) complexityText = "O(N)";
@@ -80,7 +88,8 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
 
                 const command: vscode.Command = {
                     title: `Complexity: ${complexityText}`,
-                    command: "asymptote.refreshComplexity"
+                    command: "asymptote.refreshComplexity",
+                    tooltip: `Structure Signature: ${signature}`
                 };
 
                 codeLenses.push(new vscode.CodeLens(range, command));
@@ -119,6 +128,27 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
 
         traverse(node, 0);
         return maxDepth;
+    }
+
+    private getStructureSignature(node: any): string {
+        let signature = "";
+        
+        const traverse = (currentNode: any) => {
+            if (currentNode.type === 'identifier' || currentNode.type === 'number_literal') {
+                signature += '#';
+            } else {
+                signature += currentNode.type + '|';
+            }
+
+            if (currentNode.children) {
+                for (const child of currentNode.children) {
+                    traverse(child);
+                }
+            }
+        };
+
+        traverse(node);
+        return signature.length > 100 ? signature.substring(0, 100) + "..." : signature;
     }
 
     public refresh(): void {

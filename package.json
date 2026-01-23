@@ -19,6 +19,10 @@
       {
         "command": "asymptote.refreshComplexity",
         "title": "Asymptote: Refresh Complexity"
+      },
+      {
+        "command": "asymptote.showRunner",
+        "title": "Asymptote: Open Runner"
       }
     ]
   },
