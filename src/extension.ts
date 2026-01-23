@@ -25,10 +25,8 @@ export async function activate(context: vscode.ExtensionContext) {
         });
 
         context.subscriptions.push(disposable);
-        console.log('Asymptote activated successfully!');
 
     } catch (error) {
-        console.error('Failed to activate Asymptote:', error);
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
     }
 }
@@ -50,7 +48,6 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
     public provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
         const codeLenses: vscode.CodeLens[] = [];
         const text = document.getText();
-        
         const tree = this.parser.parse(text);
         
         const query = this.lang.query(`
@@ -58,6 +55,7 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                 declarator: (function_declarator
                     declarator: (identifier) @func_name
                 )
+                body: (compound_statement) @func_body
             )
         `);
 
@@ -65,17 +63,24 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
 
         for (const match of matches) {
             const funcNameNode = match.captures.find((c: any) => c.name === 'func_name')?.node;
+            const funcBodyNode = match.captures.find((c: any) => c.name === 'func_body')?.node;
             
-            if (funcNameNode) {
+            if (funcNameNode && funcBodyNode) {
                 const range = new vscode.Range(
                     new vscode.Position(funcNameNode.startPosition.row, funcNameNode.startPosition.column),
                     new vscode.Position(funcNameNode.endPosition.row, funcNameNode.endPosition.column)
                 );
 
+                const depth = this.calculateLoopDepth(funcBodyNode);
+                let complexityText = "O(1)";
+                if (depth > 0) {
+                    if (depth === 1) complexityText = "O(N)";
+                    else complexityText = `O(N^${depth})`;
+                }
+
                 const command: vscode.Command = {
-                    title: "Complexity: O(?) (Analysis Ready)",
-                    command: "asymptote.refreshComplexity",
-                    tooltip: "Tree-sitter is working!"
+                    title: `Complexity: ${complexityText}`,
+                    command: "asymptote.refreshComplexity"
                 };
 
                 codeLenses.push(new vscode.CodeLens(range, command));
@@ -83,6 +88,37 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         }
 
         return codeLenses;
+    }
+
+    private calculateLoopDepth(node: any): number {
+        let maxDepth = 0;
+
+        const traverse = (currentNode: any, currentDepth: number) => {
+            let isLoop = false;
+            if (currentNode.type === 'for_statement' || 
+                currentNode.type === 'while_statement' || 
+                currentNode.type === 'do_statement') {
+                isLoop = true;
+            }
+
+            let nextDepth = currentDepth;
+            if (isLoop) {
+                nextDepth++;
+            }
+
+            if (nextDepth > maxDepth) {
+                maxDepth = nextDepth;
+            }
+
+            if (currentNode.children) {
+                for (const child of currentNode.children) {
+                    traverse(child, nextDepth);
+                }
+            }
+        };
+
+        traverse(node, 0);
+        return maxDepth;
     }
 
     public refresh(): void {
