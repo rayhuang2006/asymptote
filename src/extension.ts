@@ -1,18 +1,36 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 
-export function activate(context: vscode.ExtensionContext) {
-    const codelensProvider = new AsymptoteCodeLensProvider();
+const Parser = require('web-tree-sitter');
 
-    vscode.languages.registerCodeLensProvider(
-        ['cpp', 'c'],
-        codelensProvider
-    );
+export async function activate(context: vscode.ExtensionContext) {
+    try {
+        await Parser.init();
+        
+        const parser = new Parser();
+        const wasmPath = path.join(context.extensionPath, 'parsers', 'tree-sitter-cpp.wasm');
+        
+        const Lang = await Parser.Language.load(wasmPath);
+        parser.setLanguage(Lang);
 
-    let disposable = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
-        codelensProvider.refresh();
-    });
+        const codelensProvider = new AsymptoteCodeLensProvider(parser, Lang);
 
-    context.subscriptions.push(disposable);
+        vscode.languages.registerCodeLensProvider(
+            ['cpp', 'c'],
+            codelensProvider
+        );
+
+        let disposable = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
+            codelensProvider.refresh();
+        });
+
+        context.subscriptions.push(disposable);
+        console.log('Asymptote activated successfully!');
+
+    } catch (error) {
+        console.error('Failed to activate Asymptote:', error);
+        vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
+    }
 }
 
 export function deactivate() {}
@@ -21,26 +39,47 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
 
     private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
+    private parser: any;
+    private lang: any;
 
-    constructor() {}
+    constructor(parser: any, lang: any) {
+        this.parser = parser;
+        this.lang = lang;
+    }
 
     public provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
         const codeLenses: vscode.CodeLens[] = [];
-        const regex = /\b(void|int|long|double|bool|auto)\s+(\w+)\s*\([^)]*\)\s*\{/g;
         const text = document.getText();
-        let matches;
+        
+        const tree = this.parser.parse(text);
+        
+        const query = this.lang.query(`
+            (function_definition
+                declarator: (function_declarator
+                    declarator: (identifier) @func_name
+                )
+            )
+        `);
 
-        while ((matches = regex.exec(text)) !== null) {
-            const line = document.positionAt(matches.index).line;
-            const range = new vscode.Range(line, 0, line, 0);
+        const matches = query.matches(tree.rootNode);
+
+        for (const match of matches) {
+            const funcNameNode = match.captures.find((c: any) => c.name === 'func_name')?.node;
             
-            const command: vscode.Command = {
-                title: "Complexity: O(N) (Estimated)",
-                command: "asymptote.refreshComplexity", 
-                tooltip: "Click to recalculate"
-            };
+            if (funcNameNode) {
+                const range = new vscode.Range(
+                    new vscode.Position(funcNameNode.startPosition.row, funcNameNode.startPosition.column),
+                    new vscode.Position(funcNameNode.endPosition.row, funcNameNode.endPosition.column)
+                );
 
-            codeLenses.push(new vscode.CodeLens(range, command));
+                const command: vscode.Command = {
+                    title: "Complexity: O(?) (Analysis Ready)",
+                    command: "asymptote.refreshComplexity",
+                    tooltip: "Tree-sitter is working!"
+                };
+
+                codeLenses.push(new vscode.CodeLens(range, command));
+            }
         }
 
         return codeLenses;
