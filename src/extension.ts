@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { SidebarProvider } from './SidebarProvider'; 
+import { SidebarProvider } from './SidebarProvider';
 
 const Parser = require('web-tree-sitter');
 
@@ -25,17 +25,21 @@ export async function activate(context: vscode.ExtensionContext) {
         
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider(
-                "asymptote-sidebar", 
+                "asymptote-sidebar",
                 sidebarProvider
             )
         );
-        // --------------------------------------
 
         let disposableRefresh = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
             codelensProvider.refresh();
         });
 
+        let disposableOpen = vscode.commands.registerCommand('asymptote.openRunner', () => {
+            vscode.commands.executeCommand('asymptote-sidebar.focus');
+        });
+
         context.subscriptions.push(disposableRefresh);
+        context.subscriptions.push(disposableOpen);
 
     } catch (error) {
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);

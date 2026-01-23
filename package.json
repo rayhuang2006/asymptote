@@ -40,8 +40,21 @@
       {
         "command": "asymptote.refreshComplexity",
         "title": "Asymptote: Refresh Complexity"
+      },
+      {
+        "command": "asymptote.openRunner",
+        "title": "Open Asymptote Runner",
+        "icon": "media/icon.svg"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "asymptote.openRunner",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
