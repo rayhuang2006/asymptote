@@ -1,5 +1,6 @@
 {
   "name": "asymptote",
+  "publisher": "rayhuang",
   "displayName": "asymptote",
   "description": "A competitive programming companion.",
   "version": "0.0.1",
@@ -15,14 +16,30 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "asymptote-view-container",
+          "title": "Asymptote",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "asymptote-view-container": [
+        {
+          "type": "webview",
+          "id": "asymptote-sidebar",
+          "name": "Asymptote Runner",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Asymptote"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "asymptote.refreshComplexity",
         "title": "Asymptote: Refresh Complexity"
-      },
-      {
-        "command": "asymptote.showRunner",
-        "title": "Asymptote: Open Runner"
       }
     ]
   },

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { CphPanel } from './CphPanel';
+import { SidebarProvider } from './SidebarProvider'; 
 
 const Parser = require('web-tree-sitter');
 
@@ -21,16 +21,21 @@ export async function activate(context: vscode.ExtensionContext) {
             codelensProvider
         );
 
+        const sidebarProvider = new SidebarProvider(context.extensionUri);
+        
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider(
+                "asymptote-sidebar", 
+                sidebarProvider
+            )
+        );
+        // --------------------------------------
+
         let disposableRefresh = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
             codelensProvider.refresh();
         });
 
-        let disposableRunner = vscode.commands.registerCommand('asymptote.showRunner', () => {
-            CphPanel.createOrShow(context.extensionUri);
-        });
-
         context.subscriptions.push(disposableRefresh);
-        context.subscriptions.push(disposableRunner);
 
     } catch (error) {
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
@@ -40,7 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
 export function deactivate() {}
 
 class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
-
     private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
     private parser: any;
