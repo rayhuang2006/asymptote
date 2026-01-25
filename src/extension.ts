@@ -8,39 +8,27 @@ const Parser = require('web-tree-sitter');
 export async function activate(context: vscode.ExtensionContext) {
     try {
         await Parser.init();
-        
         const parser = new Parser();
         const wasmPath = path.join(context.extensionPath, 'parsers', 'tree-sitter-cpp.wasm');
-        
         const Lang = await Parser.Language.load(wasmPath);
         parser.setLanguage(Lang);
 
         const codelensProvider = new AsymptoteCodeLensProvider(parser, Lang);
 
-        vscode.languages.registerCodeLensProvider(
-            ['cpp', 'c'],
-            codelensProvider
-        );
+        vscode.languages.registerCodeLensProvider(['cpp', 'c'], codelensProvider);
 
         const sidebarProvider = new SidebarProvider(context.extensionUri, context);
-        
         context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider(
-                "asymptote-sidebar",
-                sidebarProvider
-            )
+            vscode.window.registerWebviewViewProvider("asymptote-sidebar", sidebarProvider)
         );
 
-        let disposableRefresh = vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
+        context.subscriptions.push(vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
             codelensProvider.refresh();
-        });
-
-        let disposableOpen = vscode.commands.registerCommand('asymptote.openRunner', () => {
+        }));
+        
+        context.subscriptions.push(vscode.commands.registerCommand('asymptote.openRunner', () => {
             vscode.commands.executeCommand('asymptote-sidebar.focus');
-        });
-
-        context.subscriptions.push(disposableRefresh);
-        context.subscriptions.push(disposableOpen);
+        }));
 
     } catch (error) {
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
@@ -86,32 +74,10 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                     new vscode.Position(funcNameNode.endPosition.row, funcNameNode.endPosition.column)
                 );
 
-                const signature = this.getStructureSignature(funcBodyNode);
-                const identifiedAlgo = AlgorithmRegistry.match(signature);
-
-                let title = "";
-                let displaySignature = signature.length > 100 ? signature.substring(0, 100) + "..." : signature;
-                let tooltip = `Signature: ${displaySignature}`;
-
-                if (identifiedAlgo) {
-                    title = `⚡ ${identifiedAlgo.name}: ${identifiedAlgo.complexity}`;
-                    tooltip += `\nIdentified as: ${identifiedAlgo.name}`;
-                } else {
-                    const isRecursive = this.checkRecursion(funcBodyNode, funcNameNode.text);
-                    
-                    if (isRecursive) {
-                        title = `Complexity: Recursive (O(?))`;
-                        tooltip += `\nRecursive call detected. Complexity depends on depth.`;
-                    } else {
-                        const depth = this.calculateLoopDepth(funcBodyNode);
-                        let complexityText = "O(1)";
-                        if (depth > 0) {
-                            if (depth === 1) complexityText = "O(N)";
-                            else complexityText = `O(N^${depth})`;
-                        }
-                        title = `Complexity: ${complexityText}`;
-                    }
-                }
+                const result = this.analyzeBlock(funcBodyNode, funcNameNode.text);
+                
+                let title = `Complexity: ${result.complexity}`;
+                let tooltip = `Analysis Breakdown:\n${result.reason}`;
 
                 const command: vscode.Command = {
                     title: title,
@@ -126,79 +92,131 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         return codeLenses;
     }
 
-    private checkRecursion(node: any, funcName: string): boolean {
-        let isRecursive = false;
+    private analyzeBlock(node: any, funcName: string): { complexity: string, reason: string } {
+        const signature = this.getStructureSignature(node);
+        const algo = AlgorithmRegistry.match(signature);
+        if (algo) {
+            return { complexity: algo.complexity, reason: `Matches pattern: ${algo.name}` };
+        }
+
+        const recComplexity = this.analyzeRecursion(node, funcName);
+        if (recComplexity) {
+            return { complexity: `Recursive (${recComplexity})`, reason: `Recursive calls detected (${recComplexity})` };
+        }
+
+        let maxComplexity = "O(1)";
+        let reason = "Constant time operations";
+        let loopMultiplier = 0;
+        let innerComplexity = "O(1)";
+
+        const children = node.children || [];
+        for (const child of children) {
+            if (this.isLoop(child)) {
+                const bodyNode = child.childForFieldName('body');
+                const bodyResult = this.analyzeBlock(bodyNode, funcName);
+                
+                const combined = this.multiplyComplexity("O(N)", bodyResult.complexity);
+                
+                if (this.compareComplexity(combined, maxComplexity) > 0) {
+                    maxComplexity = combined;
+                    reason = `Loop (O(N)) wrapping: ${bodyResult.complexity}`;
+                }
+            } else if (child.type === 'compound_statement' || child.type === 'if_statement') {
+                 const nested = this.analyzeBlock(child, funcName);
+                 if (this.compareComplexity(nested.complexity, maxComplexity) > 0) {
+                     maxComplexity = nested.complexity;
+                     reason = nested.reason;
+                 }
+            }
+        }
+
+        return { complexity: maxComplexity, reason };
+    }
+
+    private isLoop(node: any): boolean {
+        return node.type === 'for_statement' || node.type === 'while_statement' || node.type === 'do_statement';
+    }
+
+    private multiplyComplexity(outer: string, inner: string): string {
+        if (inner === "O(1)") return outer;
+        if (outer === "O(1)") return inner;
+        
+        const cleanOuter = outer.replace(/O\(|\)/g, '');
+        const cleanInner = inner.replace(/O\(|\)/g, '');
+
+        if (cleanInner.startsWith('N^')) {
+             const power = parseInt(cleanInner.split('^')[1]) || 1;
+             return `O(N^${power + 1})`;
+        }
+        if (cleanInner === 'N') return `O(N^2)`;
+
+        return `O(${cleanOuter} ${cleanInner})`;
+    }
+
+    private compareComplexity(a: string, b: string): number {
+        const score = (c: string) => {
+            if (c.includes('2^N')) return 100;
+            if (c.includes('N^3')) return 40;
+            if (c.includes('N^2')) return 30;
+            if (c.includes('N log N')) return 20;
+            if (c.includes('N')) return 10;
+            if (c.includes('log N')) return 5;
+            return 1;
+        };
+        return score(a) - score(b);
+    }
+
+    private analyzeRecursion(node: any, funcName: string): string | null {
+        let callCount = 0;
+        let hasDivision = false;
+        let hasSubtraction = false;
 
         const traverse = (currentNode: any) => {
-            if (isRecursive) return;
-
             if (currentNode.type === 'call_expression') {
                 const functionNode = currentNode.childForFieldName('function');
                 if (functionNode && functionNode.text === funcName) {
-                    isRecursive = true;
-                    return;
+                    callCount++;
+                    const args = currentNode.childForFieldName('arguments');
+                    if (args) {
+                        if (args.text.includes('/') || args.text.includes('>>')) {
+                            hasDivision = true;
+                        } else if (args.text.includes('-') || args.text.includes('--')) {
+                            hasSubtraction = true;
+                        }
+                    }
                 }
             }
-
             if (currentNode.children) {
                 for (const child of currentNode.children) {
                     traverse(child);
                 }
             }
         };
-
         traverse(node);
-        return isRecursive;
-    }
 
-    private calculateLoopDepth(node: any): number {
-        let maxDepth = 0;
-
-        const traverse = (currentNode: any, currentDepth: number) => {
-            let isLoop = false;
-            if (currentNode.type === 'for_statement' || 
-                currentNode.type === 'while_statement' || 
-                currentNode.type === 'do_statement') {
-                isLoop = true;
-            }
-
-            let nextDepth = currentDepth;
-            if (isLoop) {
-                nextDepth++;
-            }
-
-            if (nextDepth > maxDepth) {
-                maxDepth = nextDepth;
-            }
-
-            if (currentNode.children) {
-                for (const child of currentNode.children) {
-                    traverse(child, nextDepth);
-                }
-            }
-        };
-
-        traverse(node, 0);
-        return maxDepth;
+        if (callCount === 0) return null;
+        if (callCount >= 2) return "O(2^N)";
+        if (hasDivision) return "O(log N)";
+        if (hasSubtraction) return "O(N)";
+        return "O(N)"; 
     }
 
     private getStructureSignature(node: any): string {
         let signature = "";
-        
         const traverse = (currentNode: any) => {
+
+            
             if (currentNode.type === 'identifier' || currentNode.type === 'number_literal') {
                 signature += '#';
             } else {
                 signature += currentNode.type + '|';
             }
-
             if (currentNode.children) {
                 for (const child of currentNode.children) {
                     traverse(child);
                 }
             }
         };
-
         traverse(node);
         return signature;
     }
