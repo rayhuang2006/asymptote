@@ -37,6 +37,75 @@ export async function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
+class Complexity {
+    public n: number;
+    public log: number;
+    public isExp: boolean;
+
+    constructor(n: number = 0, log: number = 0, isExp: boolean = false) {
+        this.n = n;
+        this.log = log;
+        this.isExp = isExp;
+    }
+
+    static fromString(s: string): Complexity {
+        if (s.includes('2^N')) return new Complexity(0, 0, true);
+        if (s.includes('N^2')) return new Complexity(2, 0);
+        if (s.includes('N log N')) return new Complexity(1, 1);
+        if (s.includes('log N')) return new Complexity(0, 1);
+        if (s.includes('O(N)')) return new Complexity(1, 0);
+        if (s.includes('O(1)')) return new Complexity(0, 0);
+        
+        if (s.includes('N')) return new Complexity(1, 0);
+        
+        return new Complexity(0, 0);
+    }
+
+    multiply(other: Complexity): Complexity {
+        if (this.isExp || other.isExp) {
+            return new Complexity(0, 0, true);
+        }
+        return new Complexity(this.n + other.n, this.log + other.log);
+    }
+
+    compare(other: Complexity): number {
+        if (this.isExp && !other.isExp) return 1;
+        if (!this.isExp && other.isExp) return -1;
+        if (this.isExp && other.isExp) return 0;
+
+        if (this.n !== other.n) {
+            return this.n - other.n;
+        }
+        return this.log - other.log;
+    }
+
+    toString(): string {
+        if (this.isExp) return "O( 2ᴺ )";
+        
+        if (this.n === 0 && this.log === 0) return "O( 1 )";
+
+        let parts = [];
+        if (this.n > 0) {
+            if (this.n === 1) parts.push("N");
+            else parts.push(`N${this.toSuperscript(this.n)}`);
+        }
+        if (this.log > 0) {
+            if (this.log === 1) parts.push("log N");
+            else parts.push(`(log N)${this.toSuperscript(this.log)}`);
+        }
+
+        return `O( ${parts.join(' ')} )`;
+    }
+
+    private toSuperscript(num: number): string {
+        const superscripts: { [key: string]: string } = {
+            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+            '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+        };
+        return num.toString().split('').map(char => superscripts[char] || char).join('');
+    }
+}
+
 class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
     private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
     public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
@@ -75,9 +144,8 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                 );
 
                 const result = this.analyzeBlock(funcBodyNode, funcNameNode.text);
-                const prettyComplexity = this.formatComplexity(result.complexity);
                 
-                let title = `Complexity: ${prettyComplexity}`;
+                let title = `Complexity: ${result.complexity.toString()}`;
                 let tooltip = `Analysis Breakdown:\n${result.reason}`;
 
                 const command: vscode.Command = {
@@ -93,50 +161,38 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         return codeLenses;
     }
 
-    private formatComplexity(complexity: string): string {
-        let formatted = complexity.replace(/\^(\w+)/g, (match, p1) => {
-            const superscripts: { [key: string]: string } = {
-                '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-                '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
-                'N': 'ᴺ', 'n': 'ⁿ'
-            };
-            return p1.split('').map((char: string) => superscripts[char] || char).join('');
-        });
-        
-        return formatted.replace(/O\(([^)]+)\)/, "O( $1 )");
-    }
-
-    private analyzeBlock(node: any, funcName: string): { complexity: string, reason: string } {
+    private analyzeBlock(node: any, funcName: string): { complexity: Complexity, reason: string } {
         const recComplexity = this.analyzeRecursion(node, funcName);
         if (recComplexity) {
-            return { complexity: `Recursive ( ${recComplexity} )`, reason: `Recursive calls detected ( ${recComplexity} )` };
+            const compObj = Complexity.fromString(recComplexity);
+            return { complexity: compObj, reason: `Recursive calls detected (${recComplexity})` };
         }
 
-        let maxComplexity = "O(1)";
+        let maxComplexity = new Complexity(0, 0);
         let reason = "Constant time operations";
 
         const signature = this.getStructureSignature(node);
         const algo = AlgorithmRegistry.match(signature);
-        let baseComplexity = "O(1)";
+        let baseComplexity = new Complexity(0, 0);
         let algoName = "";
 
         if (algo) {
-            baseComplexity = algo.complexity;
+            baseComplexity = Complexity.fromString(algo.complexity);
             algoName = algo.name;
             maxComplexity = baseComplexity;
             reason = `Pattern: ${algoName}`;
         }
 
-        const isBinarySearchPattern = algo && algo.complexity.includes('log N');
+        const isBinarySearchPattern = algo && baseComplexity.log > 0;
 
         const children = node.children || [];
         for (const child of children) {
-            let currentComplexity = "O(1)";
+            let currentComplexity = new Complexity(0, 0);
             let currentReason = "";
 
             if (child.type === 'expression_statement') {
-                const callComplexity = this.getFunctionCallComplexity(child);
-                currentComplexity = callComplexity;
+                const callComplexityStr = this.getFunctionCallComplexity(child);
+                currentComplexity = Complexity.fromString(callComplexityStr);
                 currentReason = `Call: ${child.text.trim().split('(')[0]}`;
             }
             else if (this.isLoop(child)) {
@@ -146,11 +202,11 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                 let loopCost = this.getLoopComplexity(child);
                 
                 if (isBinarySearchPattern && child.type === 'while_statement') {
-                    loopCost = "O(log N)";
+                    loopCost = new Complexity(0, 1);
                 }
 
-                currentComplexity = this.multiplyComplexity(loopCost, bodyResult.complexity);
-                currentReason = `Loop (${loopCost}) wrapping: ${bodyResult.complexity}`;
+                currentComplexity = loopCost.multiply(bodyResult.complexity);
+                currentReason = `Loop (${loopCost.toString()}) wrapping: ${bodyResult.complexity.toString()}`;
             } 
             else if (child.type === 'compound_statement' || child.type === 'if_statement') {
                  const nested = this.analyzeBlock(child, funcName);
@@ -158,11 +214,11 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                  currentReason = nested.reason;
             }
 
-            if (this.compareComplexity(currentComplexity, maxComplexity) > 0) {
+            if (currentComplexity.compare(maxComplexity) > 0) {
                 maxComplexity = currentComplexity;
                 reason = currentReason;
                 
-                if (algo && maxComplexity.includes(baseComplexity.replace('O(', '').replace(')', ''))) {
+                if (algo && maxComplexity.compare(baseComplexity) > 0) {
                      reason = `${algoName} combined with inner logic`;
                 }
             }
@@ -186,56 +242,25 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         return "O(1)";
     }
 
-    private getLoopComplexity(node: any): string {
+    private getLoopComplexity(node: any): Complexity {
         if (node.type === 'for_statement') {
             const update = node.childForFieldName('update');
             if (update) {
                 if (update.type === 'assignment_expression') {
                     if (update.text.includes('*=') || update.text.includes('/=') || update.text.includes('>>=') || update.text.includes('<<=')) {
-                        return "O(log N)";
+                        return new Complexity(0, 1);
                     }
                 }
             }
+        } else if (node.type === 'while_statement') {
+            const body = node.childForFieldName('body');
+            if (body) {
+                if (body.text.includes('*=') || body.text.includes('/=') || body.text.includes('>>=') || body.text.includes('<<=')) {
+                    return new Complexity(0, 1);
+                }
+            }
         }
-        return "O(N)";
-    }
-
-    private multiplyComplexity(outer: string, inner: string): string {
-        if (inner === "O(1)") return outer;
-        if (outer === "O(1)") return inner;
-        
-        const cleanOuter = outer.replace(/O\(|\)/g, '');
-        const cleanInner = inner.replace(/O\(|\)/g, '');
-
-        if (cleanOuter === 'log N' && cleanInner === 'N') return "O(N log N)";
-        if (cleanOuter === 'N' && cleanInner === 'log N') return "O(N log N)";
-        if (cleanOuter === 'N log N' || cleanInner === 'N log N') {
-             return "O(N^2 log N)"; 
-        }
-
-        if (cleanInner.startsWith('N^')) {
-             const power = parseInt(cleanInner.split('^')[1]) || 1;
-             return `O(N^${power + 1})`;
-        }
-        if (cleanInner === 'N') {
-            if (cleanOuter === 'N') return `O(N^2)`;
-        }
-
-        return `O(${cleanOuter} ${cleanInner})`;
-    }
-
-    private compareComplexity(a: string, b: string): number {
-        const score = (c: string) => {
-            if (c.includes('N^2 log N')) return 50;
-            if (c.includes('2^N')) return 100;
-            if (c.includes('N^3')) return 40;
-            if (c.includes('N^2')) return 30;
-            if (c.includes('N log N')) return 20;
-            if (c.includes('N')) return 10;
-            if (c.includes('log N')) return 5;
-            return 1;
-        };
-        return score(a) - score(b);
+        return new Complexity(1, 0);
     }
 
     private analyzeRecursion(node: any, funcName: string): string | null {
