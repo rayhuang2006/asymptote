@@ -30,6 +30,18 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.commands.executeCommand('asymptote-sidebar.focus');
         }));
 
+        context.subscriptions.push(vscode.commands.registerCommand('asymptote.toggleCodeLens', async () => {
+            const config = vscode.workspace.getConfiguration('asymptote');
+            const currentValue = config.get<boolean>('enableCodeLens');
+            await config.update('enableCodeLens', !currentValue, vscode.ConfigurationTarget.Global);
+        }));
+
+        context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('asymptote.enableCodeLens')) {
+                codelensProvider.refresh();
+            }
+        }));
+
     } catch (error) {
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
     }
@@ -41,11 +53,13 @@ class Complexity {
     public n: number;
     public log: number;
     public isExp: boolean;
+    public isEstimate: boolean;
 
-    constructor(n: number = 0, log: number = 0, isExp: boolean = false) {
+    constructor(n: number = 0, log: number = 0, isExp: boolean = false, isEstimate: boolean = false) {
         this.n = n;
         this.log = log;
         this.isExp = isExp;
+        this.isEstimate = isEstimate;
     }
 
     static fromString(s: string): Complexity {
@@ -55,17 +69,20 @@ class Complexity {
         if (s.includes('log N')) return new Complexity(0, 1);
         if (s.includes('O(N)')) return new Complexity(1, 0);
         if (s.includes('O(1)')) return new Complexity(0, 0);
-        
         if (s.includes('N')) return new Complexity(1, 0);
-        
         return new Complexity(0, 0);
     }
 
     multiply(other: Complexity): Complexity {
         if (this.isExp || other.isExp) {
-            return new Complexity(0, 0, true);
+            return new Complexity(0, 0, true, this.isEstimate || other.isEstimate);
         }
-        return new Complexity(this.n + other.n, this.log + other.log);
+        return new Complexity(
+            this.n + other.n, 
+            this.log + other.log, 
+            false, 
+            this.isEstimate || other.isEstimate
+        );
     }
 
     compare(other: Complexity): number {
@@ -80,21 +97,24 @@ class Complexity {
     }
 
     toString(): string {
-        if (this.isExp) return "O( 2ᴺ )";
-        
-        if (this.n === 0 && this.log === 0) return "O( 1 )";
-
-        let parts = [];
-        if (this.n > 0) {
-            if (this.n === 1) parts.push("N");
-            else parts.push(`N${this.toSuperscript(this.n)}`);
+        let baseStr = "";
+        if (this.isExp) baseStr = "2ᴺ";
+        else if (this.n === 0 && this.log === 0) baseStr = "1";
+        else {
+            let parts = [];
+            if (this.n > 0) {
+                if (this.n === 1) parts.push("N");
+                else parts.push(`N${this.toSuperscript(this.n)}`);
+            }
+            if (this.log > 0) {
+                if (this.log === 1) parts.push("log N");
+                else parts.push(`(log N)${this.toSuperscript(this.log)}`);
+            }
+            baseStr = parts.join(' ');
         }
-        if (this.log > 0) {
-            if (this.log === 1) parts.push("log N");
-            else parts.push(`(log N)${this.toSuperscript(this.log)}`);
-        }
 
-        return `O( ${parts.join(' ')} )`;
+        const suffix = this.isEstimate ? " (?)" : "";
+        return `O( ${baseStr} )${suffix}`;
     }
 
     private toSuperscript(num: number): string {
@@ -118,6 +138,11 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
     }
 
     public provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
+        const config = vscode.workspace.getConfiguration('asymptote');
+        if (!config.get<boolean>('enableCodeLens', true)) {
+            return [];
+        }
+
         const codeLenses: vscode.CodeLens[] = [];
         const text = document.getText();
         const tree = this.parser.parse(text);
@@ -146,7 +171,11 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                 const result = this.analyzeBlock(funcBodyNode, funcNameNode.text);
                 
                 let title = `Complexity: ${result.complexity.toString()}`;
+                
                 let tooltip = `Analysis Breakdown:\n${result.reason}`;
+                if (result.complexity.isEstimate) {
+                    tooltip += `\n\n⚠️ Warning: Contains unidentified function calls. Actual complexity might be higher.`;
+                }
 
                 const command: vscode.Command = {
                     title: title,
@@ -191,9 +220,9 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
             let currentReason = "";
 
             if (child.type === 'expression_statement') {
-                const callComplexityStr = this.getFunctionCallComplexity(child);
-                currentComplexity = Complexity.fromString(callComplexityStr);
-                currentReason = `Call: ${child.text.trim().split('(')[0]}`;
+                const callResult = this.getFunctionCallComplexity(child);
+                currentComplexity = callResult.complexity;
+                currentReason = callResult.reason;
             }
             else if (this.isLoop(child)) {
                 const bodyNode = child.childForFieldName('body');
@@ -222,6 +251,10 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                      reason = `${algoName} combined with inner logic`;
                 }
             }
+            
+            if (currentComplexity.isEstimate) {
+                maxComplexity.isEstimate = true;
+            }
         }
         
         return { complexity: maxComplexity, reason };
@@ -231,15 +264,27 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         return node.type === 'for_statement' || node.type === 'while_statement' || node.type === 'do_statement';
     }
 
-    private getFunctionCallComplexity(node: any): string {
+    private getFunctionCallComplexity(node: any): { complexity: Complexity, reason: string } {
         const text = node.text;
+        
         if (text.includes('sort(') || text.includes('stable_sort(')) {
-            return "O(N log N)";
+            return { complexity: new Complexity(1, 1), reason: `Call: sort (O(N log N))` };
         }
         if (text.includes('lower_bound(') || text.includes('upper_bound(') || text.includes('binary_search(')) {
-            return "O(log N)";
+            return { complexity: new Complexity(0, 1), reason: `Call: binary search (O(log N))` };
         }
-        return "O(1)";
+        if (text.includes('push_back(') || text.includes('pop_back(') || text.includes('max(') || text.includes('min(')) {
+             return { complexity: new Complexity(0, 0), reason: `Call: O(1) op` };
+        }
+
+        if (text.match(/[a-zA-Z_]\w*\s*\(/)) {
+             return { 
+                 complexity: new Complexity(0, 0, false, true),
+                 reason: `Call: Unknown function '${text.trim().split('(')[0]}'` 
+             };
+        }
+
+        return { complexity: new Complexity(0, 0), reason: "Expression" };
     }
 
     private getLoopComplexity(node: any): Complexity {
