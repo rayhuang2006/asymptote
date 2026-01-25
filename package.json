@@ -4,8 +4,12 @@
   "displayName": "asymptote",
   "description": "A competitive programming companion.",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rayhuang2006/asymptote.git"
+  },
   "engines": {
-    "vscode": "^1.107.1"
+    "vscode": "^1.108.0"
   },
   "categories": [
     "Other"
