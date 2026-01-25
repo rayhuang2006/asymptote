@@ -40,6 +40,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Uncomment the following steps to publish to VS Code Marketplace
-      # - name: Publish to Marketplace
-      #   run: vsce publish -p ${{ secrets.VSCE_PAT }}
+      - name: Publish to Marketplace
+        run: vsce publish -p ${{ secrets.VSCE_PAT }}
