@@ -1,7 +1,7 @@
 {
-  "name": "asymptote",
+  "name": "asymptote-helper",
   "publisher": "rayhuang2006",
-  "displayName": "asymptote",
+  "displayName": "Asymptote",
   "description": "A competitive programming companion.",
   "version": "0.0.1",
   "icon": "media/icon.png",
