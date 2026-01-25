@@ -3,8 +3,9 @@
   <h1>Asymptote</h1>
   <p><strong>Time Complexity Analysis & Companion for Competitive Programming</strong></p>
 
+  [![VS Code Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/rayhuang2006.asymptote-helper?style=flat-square&label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=rayhuang2006.asymptote-helper)
+  [![Installs](https://img.shields.io/visual-studio-marketplace/i/rayhuang2006.asymptote-helper?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=rayhuang2006.asymptote-helper)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![VS Code](https://img.shields.io/badge/Visual%20Studio%20Code-007ACC?logo=visual-studio-code&logoColor=white)](https://code.visualstudio.com/)
 </div>
 
 <br />
