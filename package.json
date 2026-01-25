@@ -4,6 +4,7 @@
   "displayName": "asymptote",
   "description": "A competitive programming companion.",
   "version": "0.0.1",
+  "icon": "media/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/rayhuang2006/asymptote.git"

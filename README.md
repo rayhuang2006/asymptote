@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="media/icon.svg" width="120" alt="Asymptote Logo" />
+  <img src="media/icon.png" width="120" alt="Asymptote Logo" />
   <h1>Asymptote</h1>
   <p><strong>Time Complexity Analysis & Companion for Competitive Programming</strong></p>
 
