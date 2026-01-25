@@ -8,7 +8,10 @@ import { Scraper } from "./utils/Scraper";
 export class SidebarProvider implements vscode.WebviewViewProvider {
   _view?: vscode.WebviewView;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _context: vscode.ExtensionContext
+  ) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -23,6 +26,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+
+    const savedState = this._context.workspaceState.get('asymptote-state') as any;
+    if (savedState) {
+        setTimeout(() => {
+            this._view?.webview.postMessage({
+                type: 'restore-state',
+                state: savedState
+            });
+        }, 500);
+    }
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
@@ -40,6 +53,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
               problemHtml: '<div style="padding:20px;text-align:center;opacity:0.6;">Manual Mode<br>No problem loaded.</div>'
           });
           break;
+        case "save-state":
+            await this._context.workspaceState.update('asymptote-state', data.state);
+            break;
       }
     });
   }
@@ -332,10 +348,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             const fetchBtn = document.getElementById('fetchBtn');
             const problemContent = document.getElementById('problem-content');
             let testCaseCount = 0;
+            let debounceTimer;
+
+            function saveState() {
+                const state = {
+                    view: 'workspace',
+                    tab: document.getElementById('tab-btn-runner').classList.contains('active') ? 'runner' : 'problem',
+                    problemHtml: problemContent.innerHTML,
+                    testCases: collectCases()
+                };
+                vscode.postMessage({ command: 'save-state', state: state });
+            }
+
+            function triggerSave() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(saveState, 500);
+            }
 
             function showParseUI() { mainMenu.classList.add('hidden'); parseUI.classList.remove('hidden'); }
             function hideParseUI() { parseUI.classList.add('hidden'); mainMenu.classList.remove('hidden'); }
-            function manualStart() { vscode.postMessage({ command: 'manual-create' }); }
+            function manualStart() { 
+                vscode.postMessage({ command: 'manual-create' }); 
+            }
             function startParsing() {
                 const url = document.getElementById('problem-url').value;
                 if(!url) return;
@@ -347,6 +381,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 container.innerHTML = ''; testCaseCount = 0;
                 workspaceView.classList.add('hidden'); homeView.classList.remove('hidden'); hideParseUI();
                 fetchBtn.disabled = false; fetchBtn.innerText = 'Fetch';
+                vscode.postMessage({ command: 'save-state', state: null }); 
             }
 
             function switchTab(tabName) {
@@ -361,6 +396,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         document.querySelectorAll('textarea').forEach(autoResize);
                     }, 50);
                 }
+                triggerSave();
             }
 
             function autoResize(el) {
@@ -383,12 +419,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         </div>
                     </div>
                     <div class="case-body">
-                        <span class="label">Input</span><textarea class="input-box" rows="2" oninput="autoResize(this)">\${inputVal}</textarea>
-                        <span class="label">Expected</span><textarea class="expected-box" rows="2" oninput="autoResize(this)">\${expectedVal}</textarea>
-                        <span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..." oninput="autoResize(this)"></textarea>
+                        <span class="label">Input</span><textarea class="input-box" rows="2" oninput="autoResize(this); triggerSave()">\${inputVal}</textarea>
+                        <span class="label">Expected</span><textarea class="expected-box" rows="2" oninput="autoResize(this); triggerSave()">\${expectedVal}</textarea>
+                        <span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>
                     </div>\`;
                 container.appendChild(div); 
                 updateIndices();
+                triggerSave();
                 
                 setTimeout(() => {
                     div.querySelectorAll('textarea').forEach(autoResize);
@@ -396,17 +433,48 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             }
 
             function toggleCase(h) { h.parentElement.classList.toggle('collapsed'); }
-            function removeTestCase(b, e) { e.stopPropagation(); b.closest('.test-case').remove(); updateIndices(); }
+            function removeTestCase(b, e) { e.stopPropagation(); b.closest('.test-case').remove(); updateIndices(); triggerSave(); }
             function cloneCase(id, e) { e.stopPropagation(); const o = document.getElementById(id); if(o) addTestCase(o.querySelector('.input-box').value, o.querySelector('.expected-box').value); }
             function updateIndices() { let i = 0; container.querySelectorAll('.test-case').forEach(c => { i++; c.querySelector('.case-number').innerText = '#' + i; }); }
             function runSingleCase(id, e) { e.stopPropagation(); const c = document.getElementById(id); if(!c) return; resetCaseUI(c); vscode.postMessage({ command: 'run', testCases: [{ input: c.querySelector('.input-box').value, expected: c.querySelector('.expected-box').value, id }] }); }
-            function runTests() { const c = []; container.querySelectorAll('.test-case').forEach(t => { c.push({ input: t.querySelector('.input-box').value, expected: t.querySelector('.expected-box').value, id: t.id }); resetCaseUI(t); }); if(c.length) sendRunCommand(c); }
+            function runTests() { const c = collectCases(); if(c.length) sendRunCommand(c); }
             function resetCaseUI(c) { c.querySelector('.output-box').value = ''; c.querySelector('.status-tag').innerText = ''; c.querySelector('.time-tag').innerText = ''; c.classList.remove('AC', 'WA', 'collapsed'); }
             function sendRunCommand(c) { runBtn.disabled = true; runBtn.innerText = 'Compiling...'; vscode.postMessage({ command: 'run', testCases: c }); }
+            
+            function collectCases() {
+                const cases = [];
+                container.querySelectorAll('.test-case').forEach(c => {
+                    cases.push({
+                        input: c.querySelector('.input-box').value,
+                        expected: c.querySelector('.expected-box').value,
+                        id: c.id
+                    });
+                });
+                return cases;
+            }
 
             window.addEventListener('message', event => {
                 const msg = event.data;
-                if (msg.type === 'navigate') {
+                
+                if (msg.type === 'restore-state') {
+                    const state = msg.state;
+                    if (state && state.view === 'workspace') {
+                         homeView.classList.add('hidden');
+                         workspaceView.classList.remove('hidden');
+                         problemContent.innerHTML = state.problemHtml || '';
+                         
+                         if (window.MathJax) {
+                            setTimeout(() => { window.MathJax.typesetPromise([problemContent]); }, 100);
+                         }
+                         
+                         if (state.testCases) {
+                             state.testCases.forEach(c => addTestCase(c.input, c.expected));
+                         }
+                         
+                         switchTab(state.tab || 'runner');
+                    }
+                }
+                else if (msg.type === 'navigate') {
                     if (msg.view === 'workspace') {
                         homeView.classList.add('hidden');
                         workspaceView.classList.remove('hidden');
@@ -426,6 +494,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         } else {
                             addTestCase();
                         }
+                        triggerSave();
                     }
                 } 
                 else if (msg.type === 'status') {

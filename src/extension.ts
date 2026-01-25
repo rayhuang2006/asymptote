@@ -21,7 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
             codelensProvider
         );
 
-        const sidebarProvider = new SidebarProvider(context.extensionUri);
+        const sidebarProvider = new SidebarProvider(context.extensionUri, context);
         
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider(
