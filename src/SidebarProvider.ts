@@ -3,6 +3,7 @@ import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { performance } from "perf_hooks";
+import { Scraper } from "./utils/Scraper";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   _view?: vscode.WebviewView;
@@ -29,39 +30,48 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           await this.runTests(data.testCases);
           break;
         case "parse-url":
-          const problemHtml = `
-            <h2 style="margin-top:0">A. Watermelon</h2>
-            <div style="font-size:11px; opacity:0.8; margin-bottom:10px;">
-                time limit: 1s | memory limit: 64MB
-            </div>
-            <p>One hot summer day Pete and his friend Billy decided to buy a watermelon. They chose the biggest and the ripest one, in their opinion. After that the watermelon was weighed, and the scales showed <i>w</i> kilos.</p>
-            <p>Pete and Billy are great fans of even numbers, that's why they want to divide the watermelon in such a way that each of the two parts weighs even number of kilos.</p>
-            <h3>Input</h3>
-            <p>The first (and the only) input line contains integer number <i>w</i> (1 &le; <i>w</i> &le; 100).</p>
-            <h3>Output</h3>
-            <p>Print YES, if the boys can divide the watermelon into two parts, each of them weighing even number of kilos; and NO in the opposite case.</p>
-          `;
-          
-          this._view?.webview.postMessage({ 
-              type: 'navigate', 
-              view: 'workspace',
-              tab: 'problem', // 預設切換到題目頁
-              problemHtml: problemHtml,
-              initialData: [
-                  { input: '8', expected: 'YES', id: 'mock-1' },
-              ]
-          });
+          await this.handleParseUrl(data.url);
           break;
         case "manual-create":
           this._view?.webview.postMessage({ 
               type: 'navigate', 
               view: 'workspace',
-              tab: 'runner', // 手動建立時預設切換到 Runner
-              problemHtml: '<p style="padding:20px; text-align:center; opacity:0.6;">No problem description available.<br>Created manually.</p>'
+              tab: 'runner',
+              problemHtml: '<div style="padding:20px;text-align:center;opacity:0.6;">Manual Mode<br>No problem loaded.</div>'
           });
           break;
       }
     });
+  }
+
+  private async handleParseUrl(url: string) {
+      if (!this._view) return;
+
+      this._view.webview.postMessage({ type: 'status', value: 'Fetching...' });
+
+      try {
+          const problem = await Scraper.parse(url);
+
+          const fullProblemHtml = `
+            <h2 style="margin-top:0">${problem.title}</h2>
+            <div style="font-size:11px; opacity:0.8; margin-bottom:15px; border-bottom:1px solid var(--vscode-panel-border); padding-bottom:10px;">
+                time limit: ${problem.timeLimit} | memory limit: ${problem.memoryLimit}
+            </div>
+            ${problem.htmlContent}
+          `;
+
+          this._view.webview.postMessage({ 
+              type: 'navigate', 
+              view: 'workspace',
+              tab: 'problem',
+              problemHtml: fullProblemHtml,
+              initialData: problem.testCases
+          });
+
+      } catch (error: any) {
+          vscode.window.showErrorMessage(`Scraping Failed: ${error.message}`);
+          this._view.webview.postMessage({ type: 'status', value: 'Error' });
+      }
   }
 
   private async runTests(testCases: { input: string; expected: string; id: string }[]) {
@@ -169,14 +179,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Asymptote</title>
+        <script>
+            window.MathJax = {
+                tex: { 
+                    inlineMath: [['$', '$'], ['$$$', '$$$'], ['\\\\(', '\\\\)']], 
+                    displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] 
+                },
+                svg: { fontCache: 'global' }
+            };
+        </script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+        
         <style>
             :root { --vscode-green: #4EC9B0; --vscode-red: #F14C4C; --border-radius: 4px; }
             body { font-family: var(--vscode-font-family); background-color: var(--vscode-sideBar-background); color: var(--vscode-editor-foreground); padding: 0; margin: 0; overflow-x: hidden;}
             
             .hidden { display: none !important; }
-            .container { padding: 10px; }
-
-            /* Home View */
+            
             .home-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 90vh; text-align: center; padding: 20px; }
             .logo { font-size: 40px; margin-bottom: 20px; opacity: 0.8; }
             .home-title { font-size: 18px; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
@@ -190,7 +209,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             .input-label { display: block; font-size: 11px; margin-bottom: 4px; opacity: 0.8; }
             .url-input { width: 100%; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px; box-sizing: border-box; }
 
-            /* Workspace Header & Tabs */
             .workspace-header { 
                 background-color: var(--vscode-sideBar-background);
                 position: sticky; top: 0; z-index: 10;
@@ -214,14 +232,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 opacity: 1; 
             }
 
-            /* Content Areas */
             .content-area { padding: 10px; height: calc(100vh - 80px); overflow-y: auto; }
             
             #problem-content { line-height: 1.5; font-size: 13px; }
             #problem-content h2, #problem-content h3 { margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 4px; }
             #problem-content p { margin-bottom: 10px; }
-
-            /* Test Cases */
+            #problem-content pre { background: var(--vscode-textBlockQuote-background); padding: 5px; overflow-x: auto; }
+            
             .test-case { background-color: var(--vscode-list-hoverBackground); border-left: 3px solid transparent; margin-bottom: 10px; border-radius: var(--border-radius); overflow: hidden; transition: all 0.2s ease; }
             .case-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; cursor: pointer; user-select: none; font-size: 12px; font-weight: 600; }
             .case-header:hover { background-color: var(--vscode-list-activeSelectionBackground); }
@@ -237,7 +254,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             .test-case.AC { border-left-color: var(--vscode-green); }
             .test-case.WA { border-left-color: var(--vscode-red); }
 
-            textarea { width: 100%; background-color: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px; box-sizing: border-box; margin-bottom: 8px; font-family: var(--vscode-editor-font-family); font-size: 12px; resize: vertical; min-height: 40px; }
+            textarea { 
+                width: 100%; background-color: var(--vscode-input-background); 
+                color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); 
+                padding: 6px; box-sizing: border-box; margin-bottom: 8px; 
+                font-family: var(--vscode-editor-font-family); font-size: 12px; 
+                resize: none; min-height: 40px; overflow-y: hidden;
+            }
             textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
             .label { font-size: 10px; margin-bottom: 2px; color: var(--vscode-descriptionForeground); display: block; text-transform: uppercase; letter-spacing: 0.5px; }
 
@@ -267,7 +290,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     <span class="input-label">Problem URL</span>
                     <input type="text" id="problem-url" class="url-input" placeholder="https://codeforces.com/..." />
                 </div>
-                <button class="btn-primary" style="margin-top:10px" onclick="startParsing()">Fetch</button>
+                <button id="fetchBtn" class="btn-primary" style="margin-top:10px" onclick="startParsing()">Fetch</button>
                 <button class="btn-outline" onclick="hideParseUI()" style="padding: 6px;">Cancel</button>
             </div>
         </div>
@@ -306,36 +329,45 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             const parseUI = document.getElementById('parse-ui');
             const container = document.getElementById('test-cases-container');
             const runBtn = document.getElementById('runBtn');
+            const fetchBtn = document.getElementById('fetchBtn');
             const problemContent = document.getElementById('problem-content');
             let testCaseCount = 0;
 
-            // --- Navigation Logic ---
             function showParseUI() { mainMenu.classList.add('hidden'); parseUI.classList.remove('hidden'); }
             function hideParseUI() { parseUI.classList.add('hidden'); mainMenu.classList.remove('hidden'); }
             function manualStart() { vscode.postMessage({ command: 'manual-create' }); }
             function startParsing() {
                 const url = document.getElementById('problem-url').value;
                 if(!url) return;
+                fetchBtn.disabled = true;
+                fetchBtn.innerText = 'Fetching...';
                 vscode.postMessage({ command: 'parse-url', url: url });
             }
             function goHome() {
                 container.innerHTML = ''; testCaseCount = 0;
                 workspaceView.classList.add('hidden'); homeView.classList.remove('hidden'); hideParseUI();
+                fetchBtn.disabled = false; fetchBtn.innerText = 'Fetch';
             }
 
-            // --- Tab Logic ---
             function switchTab(tabName) {
-                // Update Tab Buttons
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 document.getElementById('tab-btn-' + tabName).classList.add('active');
-
-                // Update Content
                 document.getElementById('content-problem').classList.add('hidden');
                 document.getElementById('content-runner').classList.add('hidden');
                 document.getElementById('content-' + tabName).classList.remove('hidden');
+
+                if (tabName === 'runner') {
+                    setTimeout(() => {
+                        document.querySelectorAll('textarea').forEach(autoResize);
+                    }, 50);
+                }
             }
 
-            // --- Test Case Logic ---
+            function autoResize(el) {
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+            }
+
             function addTestCase(inputVal = '', expectedVal = '') {
                 testCaseCount++;
                 const id = 'case-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -351,11 +383,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         </div>
                     </div>
                     <div class="case-body">
-                        <span class="label">Input</span><textarea class="input-box" rows="2">\${inputVal}</textarea>
-                        <span class="label">Expected</span><textarea class="expected-box" rows="2">\${expectedVal}</textarea>
-                        <span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>
+                        <span class="label">Input</span><textarea class="input-box" rows="2" oninput="autoResize(this)">\${inputVal}</textarea>
+                        <span class="label">Expected</span><textarea class="expected-box" rows="2" oninput="autoResize(this)">\${expectedVal}</textarea>
+                        <span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..." oninput="autoResize(this)"></textarea>
                     </div>\`;
-                container.appendChild(div); updateIndices();
+                container.appendChild(div); 
+                updateIndices();
+                
+                setTimeout(() => {
+                    div.querySelectorAll('textarea').forEach(autoResize);
+                }, 0);
             }
 
             function toggleCase(h) { h.parentElement.classList.toggle('collapsed'); }
@@ -374,13 +411,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         homeView.classList.add('hidden');
                         workspaceView.classList.remove('hidden');
                         
-                        // Set Problem HTML
                         problemContent.innerHTML = msg.problemHtml || '';
                         
-                        // Switch to requested Tab
+                        if (window.MathJax) {
+                            setTimeout(() => {
+                                window.MathJax.typesetPromise([problemContent]);
+                            }, 100);
+                        }
+
                         switchTab(msg.tab || 'runner');
 
-                        // Fill Test Cases
                         if (msg.initialData) {
                             msg.initialData.forEach(c => addTestCase(c.input, c.expected));
                         } else {
@@ -388,13 +428,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         }
                     }
                 } 
-                else if (msg.type === 'status') runBtn.innerText = msg.value;
+                else if (msg.type === 'status') {
+                     if (msg.value === 'Fetching...') {
+                         fetchBtn.innerText = 'Fetching...';
+                         fetchBtn.disabled = true;
+                     } else if (msg.value === 'Error') {
+                         fetchBtn.innerText = 'Fetch';
+                         fetchBtn.disabled = false;
+                     } else {
+                         runBtn.innerText = msg.value;
+                     }
+                }
                 else if (msg.type === 'finished') { runBtn.innerText = 'Run All'; runBtn.disabled = false; }
                 else if (msg.type === 'compile-error') { runBtn.innerText = 'Error'; runBtn.disabled = false; alert(msg.output); }
                 else if (msg.type === 'test-result') {
                     const c = document.getElementById(msg.id);
                     if (c) {
-                        c.querySelector('.output-box').value = msg.output;
+                        const outBox = c.querySelector('.output-box');
+                        outBox.value = msg.output;
+                        autoResize(outBox);
+                        
                         c.querySelector('.time-tag').innerText = Math.round(msg.time) + 'ms';
                         const s = c.querySelector('.status-tag');
                         s.innerText = msg.statusText; s.className = 'status-tag status-' + msg.statusText;
