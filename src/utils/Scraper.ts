@@ -1,8 +1,9 @@
+import * as vscode from 'vscode';
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer-extra';
+import puppeteer from 'puppeteer-core';
+import { addExtra } from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteer.use(StealthPlugin());
+const chromeFinder = require('chrome-finder');
 
 export interface ParsedProblem {
     title: string;
@@ -16,8 +17,52 @@ export class Scraper {
     static async parse(url: string): Promise<ParsedProblem> {
         let browser = null;
         try {
-            browser = await puppeteer.launch({
+            const config = vscode.workspace.getConfiguration('asymptote');
+            let executablePath = config.get<string>('chromePath') || '';
+
+            if (!executablePath) {
+                try {
+                    executablePath = chromeFinder();
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+
+            if (!executablePath) {
+                const selection = await vscode.window.showErrorMessage(
+                    "Asymptote needs Google Chrome to parse problems. Please select your Chrome executable.",
+                    "Locate Chrome", "Cancel"
+                );
+
+                if (selection === "Locate Chrome") {
+                    const fileUri = await vscode.window.showOpenDialog({
+                        canSelectFiles: true,
+                        canSelectFolders: false,
+                        canSelectMany: false,
+                        filters: { 'Executables': ['exe', 'app', ''] },
+                        openLabel: "Select Chrome"
+                    });
+
+                    if (fileUri && fileUri[0]) {
+                        executablePath = fileUri[0].fsPath;
+                        if (process.platform === 'darwin' && executablePath.endsWith('.app')) {
+                            executablePath += '/Contents/MacOS/Google Chrome';
+                        }
+                        await config.update('chromePath', executablePath, vscode.ConfigurationTarget.Global);
+                    }
+                }
+            }
+
+            if (!executablePath) {
+                throw new Error("Chrome path not found. Cannot parse.");
+            }
+
+            const puppeteerExtra = addExtra(puppeteer);
+            puppeteerExtra.use(StealthPlugin());
+
+            browser = await puppeteerExtra.launch({
                 headless: true,
+                executablePath: executablePath,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
 
