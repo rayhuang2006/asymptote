@@ -213,7 +213,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             .hidden { display: none !important; }
             
             .home-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 90vh; text-align: center; padding: 20px; }
-            .logo { font-size: 40px; margin-bottom: 20px; opacity: 0.8; }
+            
+            .logo { margin-bottom: 20px; opacity: 0.9; }
+            
             .home-title { font-size: 18px; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
             .btn-primary { width: 100%; border: none; padding: 10px; cursor: pointer; font-size: 13px; border-radius: var(--border-radius); font-weight: 600; transition: all 0.2s; background-color: var(--vscode-button-background); color: var(--vscode-button-foreground); margin-bottom: 10px; }
             .btn-primary:hover { background-color: var(--vscode-button-hoverBackground); }
@@ -293,7 +295,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     </head>
     <body>
         <div id="home-view" class="home-container">
-            <div class="logo">🚀</div>
+            <div class="logo">
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 20L24 32L12 44" stroke="#8E9099" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M30 44H38C44 44 48 36 52 20" stroke="#4EC9B0" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M52 20L46 26M52 20L56 26" stroke="#4EC9B0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
             <div class="home-title">ASYMPTOTE</div>
             
             <div id="main-menu" style="width: 100%">
