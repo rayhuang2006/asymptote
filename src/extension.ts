@@ -97,13 +97,20 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                     title = `⚡ ${identifiedAlgo.name}: ${identifiedAlgo.complexity}`;
                     tooltip += `\nIdentified as: ${identifiedAlgo.name}`;
                 } else {
-                    const depth = this.calculateLoopDepth(funcBodyNode);
-                    let complexityText = "O(1)";
-                    if (depth > 0) {
-                        if (depth === 1) complexityText = "O(N)";
-                        else complexityText = `O(N^${depth})`;
+                    const isRecursive = this.checkRecursion(funcBodyNode, funcNameNode.text);
+                    
+                    if (isRecursive) {
+                        title = `Complexity: Recursive (O(?))`;
+                        tooltip += `\nRecursive call detected. Complexity depends on depth.`;
+                    } else {
+                        const depth = this.calculateLoopDepth(funcBodyNode);
+                        let complexityText = "O(1)";
+                        if (depth > 0) {
+                            if (depth === 1) complexityText = "O(N)";
+                            else complexityText = `O(N^${depth})`;
+                        }
+                        title = `Complexity: ${complexityText}`;
                     }
-                    title = `Complexity: ${complexityText}`;
                 }
 
                 const command: vscode.Command = {
@@ -117,6 +124,31 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         }
 
         return codeLenses;
+    }
+
+    private checkRecursion(node: any, funcName: string): boolean {
+        let isRecursive = false;
+
+        const traverse = (currentNode: any) => {
+            if (isRecursive) return;
+
+            if (currentNode.type === 'call_expression') {
+                const functionNode = currentNode.childForFieldName('function');
+                if (functionNode && functionNode.text === funcName) {
+                    isRecursive = true;
+                    return;
+                }
+            }
+
+            if (currentNode.children) {
+                for (const child of currentNode.children) {
+                    traverse(child);
+                }
+            }
+        };
+
+        traverse(node);
+        return isRecursive;
     }
 
     private calculateLoopDepth(node: any): number {
