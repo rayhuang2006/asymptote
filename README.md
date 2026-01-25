@@ -1,71 +1,91 @@
-# asymptote README
+<div align="center">
+  <img src="media/icon.svg" width="120" alt="Asymptote Logo" />
+  <h1>Asymptote</h1>
+  <p><strong>Time Complexity Analysis & Companion for Competitive Programming</strong></p>
 
-This is the README for your extension "asymptote". After writing up a brief description, we recommend including the following sections.
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![VS Code](https://img.shields.io/badge/Visual%20Studio%20Code-007ACC?logo=visual-studio-code&logoColor=white)](https://code.visualstudio.com/)
+</div>
 
-## Features
+<br />
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+**Asymptote** is a VS Code extension designed to help competitive programmers visualize the theoretical speed of their code *while typing*. It combines a heuristic complexity analyzer with a robust local test runner.
 
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+> **⚠️ Note:** The complexity analysis is **heuristic** and based on static analysis patterns. It provides a "worst-case estimation" to help you catch $O(N^2)$ or $O(2^N)$ slips before submission, but it is not a formal mathematical proof.
 
 ---
 
-## Following extension guidelines
+## ✨ Features
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+### 1. Real-time Complexity Analysis (CodeLens)
+See the Big O notation directly above your C++ functions. Asymptote parses your AST (Abstract Syntax Tree) to estimate time complexity.
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+* **Algebraic Awareness:** Understands that nested loops multiply ($N \times N = N^2$).
+* **Confidence System:** Marks analysis with `(?)` if unknown functions are detected.
+* **Toggleable:** Use `Asymptote: Toggle Complexity Lens` to show/hide the analysis instantly.
 
-## Working with Markdown
+![Complexity Analysis Demo](images/demo1.gif)
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+### 2. The Runner (Sidekick)
+A dedicated sidebar for managing test cases without leaving your editor.
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+* **Problem Parsing:** One-click import from **Codeforces**. Fetches title, limits, and sample cases.
+* **Local Execution:** Compiles and runs your code against inputs.
+* **Verdict Display:** Clear **AC**, **WA**, **TLE**, or **RE** status with execution time.
 
-## For more information
+![Runner Demo](images/demo2.gif)
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+---
 
-**Enjoy!**
+## 📋 Requirements
+
+To use the **Runner** feature (compiling and running C++ code), you must have a C++ compiler installed and accessible in your system's PATH.
+
+* **GCC/G++**: Recommended (The extension currently uses `g++ -std=c++17`).
+
+> *Note: The Complexity Analysis features work out-of-the-box without any external dependencies.*
+
+---
+
+## ⚙️ Extension Settings
+
+You can toggle the complexity CodeLens via the Command Palette or Settings:
+
+* `asymptote.enableCodeLens`: Enable/disable the complexity analysis CodeLens (default: `true`).
+
+---
+
+## 🧩 Supported Logic (Heuristics)
+
+| Structure | Complexity Estimation |
+| :--- | :--- |
+| Simple Loops | $O(N)$ |
+| Nested Loops | Multiplicative ($N \times M$) |
+| Divide & Conquer (e.g., `k *= 2`) | $O(\log N)$ |
+| `std::sort` | $O(N \log N)$ |
+| `std::lower_bound` | $O(\log N)$ |
+| Branching Recursion | $O(2^N)$ |
+
+---
+
+## 🚀 Release Notes
+
+### 0.0.1
+Initial release of Asymptote!
+* Added Heuristic Complexity Analysis CodeLens.
+* Added Secondary Sidebar Runner with Codeforces parsing.
+* Integrated Tree-sitter for robust C++ parsing.
+
+---
+
+## 🤝 Contributing
+
+This project is open source! If you want to add support for more algorithms or improve the detection logic:
+
+1.  Fork the repository.
+2.  Create your feature branch.
+3.  Submit a Pull Request.
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
