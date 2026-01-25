@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { SidebarProvider } from './SidebarProvider';
+import { AlgorithmRegistry } from './analyzer/AlgorithmRegistry';
 
 const Parser = require('web-tree-sitter');
 
@@ -85,19 +86,30 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
                     new vscode.Position(funcNameNode.endPosition.row, funcNameNode.endPosition.column)
                 );
 
-                const depth = this.calculateLoopDepth(funcBodyNode);
                 const signature = this.getStructureSignature(funcBodyNode);
+                const identifiedAlgo = AlgorithmRegistry.match(signature);
 
-                let complexityText = "O(1)";
-                if (depth > 0) {
-                    if (depth === 1) complexityText = "O(N)";
-                    else complexityText = `O(N^${depth})`;
+                let title = "";
+                let displaySignature = signature.length > 100 ? signature.substring(0, 100) + "..." : signature;
+                let tooltip = `Signature: ${displaySignature}`;
+
+                if (identifiedAlgo) {
+                    title = `⚡ ${identifiedAlgo.name}: ${identifiedAlgo.complexity}`;
+                    tooltip += `\nIdentified as: ${identifiedAlgo.name}`;
+                } else {
+                    const depth = this.calculateLoopDepth(funcBodyNode);
+                    let complexityText = "O(1)";
+                    if (depth > 0) {
+                        if (depth === 1) complexityText = "O(N)";
+                        else complexityText = `O(N^${depth})`;
+                    }
+                    title = `Complexity: ${complexityText}`;
                 }
 
                 const command: vscode.Command = {
-                    title: `Complexity: ${complexityText}`,
+                    title: title,
                     command: "asymptote.refreshComplexity",
-                    tooltip: `Structure Signature: ${signature}`
+                    tooltip: tooltip
                 };
 
                 codeLenses.push(new vscode.CodeLens(range, command));
@@ -156,7 +168,7 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         };
 
         traverse(node);
-        return signature.length > 100 ? signature.substring(0, 100) + "..." : signature;
+        return signature;
     }
 
     public refresh(): void {
