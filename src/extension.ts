@@ -30,12 +30,14 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.commands.executeCommand('asymptote-sidebar.focus');
         }));
 
+        // 新增：Toggle 指令
         context.subscriptions.push(vscode.commands.registerCommand('asymptote.toggleCodeLens', async () => {
             const config = vscode.workspace.getConfiguration('asymptote');
             const currentValue = config.get<boolean>('enableCodeLens');
             await config.update('enableCodeLens', !currentValue, vscode.ConfigurationTarget.Global);
         }));
 
+        // 新增：監聽設定變更
         context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
             if (e.affectsConfiguration('asymptote.enableCodeLens')) {
                 codelensProvider.refresh();
@@ -53,7 +55,7 @@ class Complexity {
     public n: number;
     public log: number;
     public isExp: boolean;
-    public isEstimate: boolean;
+    public isEstimate: boolean; // 新增：是否為估算值
 
     constructor(n: number = 0, log: number = 0, isExp: boolean = false, isEstimate: boolean = false) {
         this.n = n;
