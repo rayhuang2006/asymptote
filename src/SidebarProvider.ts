@@ -381,10 +381,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             #runBtn:hover { background-color: var(--vscode-button-hoverBackground); }
             #runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-            .msg-solver { align-self: flex-start; background: var(--vscode-editor-inactiveSelectionBackground); padding: 8px; border-radius: 8px 8px 8px 0; margin-bottom: 8px; max-width: 85%; font-family: var(--vscode-editor-font-family); font-size: 12px; word-wrap: break-word; white-space: pre-wrap; }
-            .msg-user { align-self: flex-end; background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px; border-radius: 8px 8px 0 8px; margin-bottom: 8px; max-width: 85%; margin-left: auto; font-family: var(--vscode-editor-font-family); font-size: 12px; word-wrap: break-word; white-space: pre-wrap; }
-            .msg-error { align-self: center; color: var(--vscode-red); font-size: 11px; margin-bottom: 8px; font-style: italic; }
-            .msg-system { align-self: center; color: var(--vscode-descriptionForeground); font-size: 11px; margin-bottom: 8px; }
+            /* Interactive Column Layout */
+            .column-header {
+                display: flex;
+                border-bottom: 1px solid var(--vscode-panel-border);
+                font-size: 10px;
+                color: var(--vscode-descriptionForeground);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                padding-bottom: 4px;
+                margin-bottom: 5px;
+            }
+            .col-left { flex: 1; padding-left: 5px; border-right: 1px solid var(--vscode-panel-border); }
+            .col-right { flex: 1; padding-left: 8px; }
+
+            .log-entry { display: flex; width: 100%; border-bottom: 1px dashed var(--vscode-panel-border); }
+            .log-cell { flex: 1; padding: 6px; font-family: var(--vscode-editor-font-family); font-size: 12px; word-wrap: break-word; white-space: pre-wrap; line-height: 1.4; }
+            .log-cell.left { border-right: 1px solid var(--vscode-panel-border); color: var(--vscode-charts-green); }
+            .log-cell.right { color: var(--vscode-textLink-foreground); }
+            
+            .msg-system { text-align: center; padding: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); width: 100%; font-style: italic; }
+            .msg-error { color: var(--vscode-red); }
+
         </style>
     </head>
     <body>
@@ -444,8 +462,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 </div>
 
                 <div id="interactive-runner" class="hidden" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
-                    <div id="chat-history" style="flex:1; overflow-y:auto; padding:10px; border:1px solid var(--vscode-panel-border); margin-bottom:10px; background: var(--vscode-editor-background); border-radius: var(--border-radius); display: flex; flex-direction: column;">
-                        <div class="msg-system" style="margin-top:20px;">Check "Enable Interactive Mode" and click Start to begin.</div>
+                    
+                    <div class="column-header">
+                        <div class="col-left">JUDGE (Input)</div>
+                        <div class="col-right">CODE (Output)</div>
+                    </div>
+
+                    <div id="chat-history" style="flex:1; overflow-y:auto; border:1px solid var(--vscode-panel-border); margin-bottom:10px; background: var(--vscode-editor-background); border-radius: var(--border-radius); display: flex; flex-direction: column;">
+                        <div class="msg-system" style="margin-top:20px;">Check "Enable Interactive Mode" and click Start.</div>
                     </div>
                     
                     <div style="display:flex; gap:5px; margin-bottom: 5px;">
@@ -630,10 +654,34 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
             function appendMessage(role, text) {
                 const history = document.getElementById('chat-history');
-                const div = document.createElement('div');
-                div.className = 'msg-' + role;
-                div.innerText = text;
-                history.appendChild(div);
+                
+                if (role === 'system') {
+                    const div = document.createElement('div');
+                    div.className = 'msg-system';
+                    div.innerText = text;
+                    history.appendChild(div);
+                } else {
+                    const row = document.createElement('div');
+                    row.className = 'log-entry';
+                    
+                    const leftCell = document.createElement('div');
+                    leftCell.className = 'log-cell left';
+                    
+                    const rightCell = document.createElement('div');
+                    rightCell.className = 'log-cell right';
+                    
+                    if (role === 'user') leftCell.innerText = text;
+                    else if (role === 'solver') rightCell.innerText = text;
+                    else if (role === 'error') {
+                        rightCell.className += ' msg-error';
+                        rightCell.innerText = text;
+                    }
+                    
+                    row.appendChild(leftCell);
+                    row.appendChild(rightCell);
+                    history.appendChild(row);
+                }
+
                 history.scrollTop = history.scrollHeight;
             }
 
