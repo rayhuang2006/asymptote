@@ -7,6 +7,7 @@ import { Scraper } from "./utils/Scraper";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   _view?: vscode.WebviewView;
+  private currentInteractiveProcess?: cp.ChildProcess;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -42,6 +43,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case "run":
           await this.runTests(data.testCases);
           break;
+        case "run-interactive":
+          await this.runInteractive();
+          break;
+        case "interactive-input":
+          if (this.currentInteractiveProcess && this.currentInteractiveProcess.stdin) {
+            try {
+                this.currentInteractiveProcess.stdin.write(data.text + '\n');
+            } catch (e) {}
+          }
+          break;
+        case "stop-interactive":
+          if (this.currentInteractiveProcess) {
+            this.currentInteractiveProcess.kill();
+            this.currentInteractiveProcess = undefined;
+          }
+          break;
         case "parse-url":
           await this.handleParseUrl(data.url);
           break;
@@ -55,6 +72,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         case "save-state":
             await this._context.workspaceState.update('asymptote-state', data.state);
+            break;
+        case "showError":
+            vscode.window.showErrorMessage(data.text);
             break;
       }
     });
@@ -88,6 +108,75 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           vscode.window.showErrorMessage(`Scraping Failed: ${error.message}`);
           this._view.webview.postMessage({ type: 'status', value: 'Error' });
       }
+  }
+
+  private async runInteractive() {
+    if (!this._view) return;
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showErrorMessage("No active editor found");
+      this._view.webview.postMessage({ type: 'interactive-stopped' });
+      return;
+    }
+
+    await editor.document.save();
+    
+    const filePath = editor.document.fileName;
+    const fileDir = path.dirname(filePath);
+    const fileName = path.basename(filePath, path.extname(filePath));
+    
+    const isWindows = process.platform === "win32";
+    const exeName = isWindows ? `${fileName}.exe` : `${fileName}.out`;
+    const exePath = path.join(fileDir, exeName);
+
+    this._view.webview.postMessage({ type: 'interactive-system', value: 'Compiling...' });
+
+    const compileCommand = `g++ -std=c++17 "${filePath}" -o "${exePath}"`;
+
+    cp.exec(compileCommand, (error, stdout, stderr) => {
+      if (error) {
+        this._view?.webview.postMessage({ 
+          type: 'interactive-error', 
+          value: `Compilation Error:\n${stderr}`
+        });
+        this._view?.webview.postMessage({ type: 'interactive-stopped' });
+        return;
+      }
+
+      this._view?.webview.postMessage({ type: 'interactive-system', value: 'Running Interactive Mode...' });
+
+      if (this.currentInteractiveProcess) {
+          this.currentInteractiveProcess.kill();
+      }
+
+      this.currentInteractiveProcess = cp.spawn(exePath, [], { cwd: fileDir });
+
+      this.currentInteractiveProcess.stdout?.on('data', (data) => {
+          this._view?.webview.postMessage({
+              type: 'interactive-stdout',
+              data: data.toString()
+          });
+      });
+
+      this.currentInteractiveProcess.stderr?.on('data', (data) => {
+          this._view?.webview.postMessage({
+              type: 'interactive-stderr',
+              data: data.toString()
+          });
+      });
+
+      this.currentInteractiveProcess.on('close', (code) => {
+          this._view?.webview.postMessage({
+              type: 'interactive-exit',
+              code: code
+          });
+          this.currentInteractiveProcess = undefined;
+          if (fs.existsSync(exePath)) {
+            try { fs.unlinkSync(exePath); } catch (e) {}
+          }
+      });
+    });
   }
 
   private async runTests(testCases: { input: string; expected: string; id: string }[]) {
@@ -291,6 +380,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             #runBtn { background-color: var(--vscode-button-background); color: var(--vscode-button-foreground); margin-top: 10px; width: 100%; border: none; padding: 10px; cursor: pointer; border-radius: var(--border-radius); font-weight: 600; }
             #runBtn:hover { background-color: var(--vscode-button-hoverBackground); }
             #runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+            .msg-solver { align-self: flex-start; background: var(--vscode-editor-inactiveSelectionBackground); padding: 8px; border-radius: 8px 8px 8px 0; margin-bottom: 8px; max-width: 85%; font-family: var(--vscode-editor-font-family); font-size: 12px; word-wrap: break-word; white-space: pre-wrap; }
+            .msg-user { align-self: flex-end; background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px; border-radius: 8px 8px 0 8px; margin-bottom: 8px; max-width: 85%; margin-left: auto; font-family: var(--vscode-editor-font-family); font-size: 12px; word-wrap: break-word; white-space: pre-wrap; }
+            .msg-error { align-self: center; color: var(--vscode-red); font-size: 11px; margin-bottom: 8px; font-style: italic; }
+            .msg-system { align-self: center; color: var(--vscode-descriptionForeground); font-size: 11px; margin-bottom: 8px; }
         </style>
     </head>
     <body>
@@ -338,9 +432,29 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             </div>
 
             <div id="content-runner" class="content-area">
-                <div id="test-cases-container"></div>
-                <button class="btn-secondary" onclick="addTestCase()">+ Add Case</button>
-                <button id="runBtn" onclick="runTests()">Run All</button>
+                <div style="margin-bottom: 10px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; display: flex; align-items: center;">
+                    <input type="checkbox" id="interactive-mode" onchange="toggleInteractive()" style="margin-right:8px;">
+                    <label for="interactive-mode" style="font-size:12px; cursor:pointer; user-select: none;">Enable Interactive Mode</label>
+                </div>
+
+                <div id="standard-runner">
+                    <div id="test-cases-container"></div>
+                    <button class="btn-secondary" onclick="addTestCase()">+ Add Case</button>
+                    <button id="runBtn" onclick="runTests()">Run All</button>
+                </div>
+
+                <div id="interactive-runner" class="hidden" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
+                    <div id="chat-history" style="flex:1; overflow-y:auto; padding:10px; border:1px solid var(--vscode-panel-border); margin-bottom:10px; background: var(--vscode-editor-background); border-radius: var(--border-radius); display: flex; flex-direction: column;">
+                        <div class="msg-system" style="margin-top:20px;">Check "Enable Interactive Mode" and click Start to begin.</div>
+                    </div>
+                    
+                    <div style="display:flex; gap:5px; margin-bottom: 5px;">
+                        <input type="text" id="manual-input" class="url-input" placeholder="Type input..." disabled onkeydown="if(event.key==='Enter') sendInput()">
+                        <button id="sendBtn" class="btn-primary" style="width:auto; margin:0;" onclick="sendInput()" disabled>Send</button>
+                    </div>
+                    <button id="interactiveStartBtn" class="btn-primary" onclick="startInteractive()">Start Interactive Session</button>
+                    <button id="interactiveStopBtn" class="btn-outline hidden" style="border-color: var(--vscode-red); color: var(--vscode-red);" onclick="stopInteractive()">Stop Process</button>
+                </div>
             </div>
         </div>
 
@@ -363,7 +477,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     view: 'workspace',
                     tab: document.getElementById('tab-btn-runner').classList.contains('active') ? 'runner' : 'problem',
                     problemHtml: problemContent.innerHTML,
-                    testCases: collectCases()
+                    testCases: collectCases(),
+                    interactive: document.getElementById('interactive-mode').checked
                 };
                 vscode.postMessage({ command: 'save-state', state: state });
             }
@@ -445,7 +560,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             function cloneCase(id, e) { e.stopPropagation(); const o = document.getElementById(id); if(o) addTestCase(o.querySelector('.input-box').value, o.querySelector('.expected-box').value); }
             function updateIndices() { let i = 0; container.querySelectorAll('.test-case').forEach(c => { i++; c.querySelector('.case-number').innerText = '#' + i; }); }
             function runSingleCase(id, e) { e.stopPropagation(); const c = document.getElementById(id); if(!c) return; resetCaseUI(c); vscode.postMessage({ command: 'run', testCases: [{ input: c.querySelector('.input-box').value, expected: c.querySelector('.expected-box').value, id }] }); }
-            function runTests() { const c = collectCases(); if(c.length) sendRunCommand(c); }
+            function runTests() { 
+                const c = collectCases(); 
+                if(c.length) sendRunCommand(c); 
+            }
             function resetCaseUI(c) { c.querySelector('.output-box').value = ''; c.querySelector('.status-tag').innerText = ''; c.querySelector('.time-tag').innerText = ''; c.classList.remove('AC', 'WA', 'collapsed'); }
             function sendRunCommand(c) { runBtn.disabled = true; runBtn.innerText = 'Compiling...'; vscode.postMessage({ command: 'run', testCases: c }); }
             
@@ -459,6 +577,64 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     });
                 });
                 return cases;
+            }
+
+            function toggleInteractive() {
+                const isInteractive = document.getElementById('interactive-mode').checked;
+                const standard = document.getElementById('standard-runner');
+                const interactive = document.getElementById('interactive-runner');
+                
+                if (isInteractive) {
+                    standard.classList.add('hidden');
+                    interactive.classList.remove('hidden');
+                } else {
+                    standard.classList.remove('hidden');
+                    interactive.classList.add('hidden');
+                }
+                triggerSave();
+            }
+
+            function startInteractive() {
+                document.getElementById('chat-history').innerHTML = '';
+                document.getElementById('manual-input').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                
+                document.getElementById('interactiveStartBtn').classList.add('hidden');
+                document.getElementById('interactiveStopBtn').classList.remove('hidden');
+                
+                vscode.postMessage({ command: 'run-interactive' });
+            }
+
+            function stopInteractive() {
+                vscode.postMessage({ command: 'stop-interactive' });
+                appendMessage('system', 'Process Stopped by User.');
+                setInteractiveStoppedState();
+            }
+            
+            function setInteractiveStoppedState() {
+                document.getElementById('manual-input').disabled = true;
+                document.getElementById('sendBtn').disabled = true;
+                document.getElementById('interactiveStartBtn').classList.remove('hidden');
+                document.getElementById('interactiveStopBtn').classList.add('hidden');
+            }
+
+            function sendInput() {
+                const input = document.getElementById('manual-input');
+                const text = input.value;
+                if (!text) return;
+                
+                appendMessage('user', text);
+                vscode.postMessage({ command: 'interactive-input', text: text });
+                input.value = '';
+            }
+
+            function appendMessage(role, text) {
+                const history = document.getElementById('chat-history');
+                const div = document.createElement('div');
+                div.className = 'msg-' + role;
+                div.innerText = text;
+                history.appendChild(div);
+                history.scrollTop = history.scrollHeight;
             }
 
             window.addEventListener('message', event => {
@@ -478,6 +654,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                          if (state.testCases) {
                              state.testCases.forEach(c => addTestCase(c.input, c.expected));
                          }
+                         
+                         if (state.interactive) {
+                             document.getElementById('interactive-mode').checked = true;
+                         }
+                         toggleInteractive();
                          
                          switchTab(state.tab || 'runner');
                     }
@@ -517,7 +698,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                      }
                 }
                 else if (msg.type === 'finished') { runBtn.innerText = 'Run All'; runBtn.disabled = false; }
-                else if (msg.type === 'compile-error') { runBtn.innerText = 'Error'; runBtn.disabled = false; alert(msg.output); }
+                else if (msg.type === 'compile-error') { 
+                    runBtn.innerText = 'Error'; 
+                    runBtn.disabled = false; 
+                    vscode.postMessage({ command: 'showError', text: msg.output });
+                }
                 else if (msg.type === 'test-result') {
                     const c = document.getElementById(msg.id);
                     if (c) {
@@ -531,6 +716,25 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         c.classList.remove('AC', 'WA'); c.classList.add(msg.passed ? 'AC' : 'WA');
                         if(msg.passed) c.classList.add('collapsed'); else c.classList.remove('collapsed');
                     }
+                }
+                else if (msg.type === 'interactive-stdout') {
+                    appendMessage('solver', msg.data);
+                }
+                else if (msg.type === 'interactive-stderr') {
+                    appendMessage('error', msg.data);
+                }
+                else if (msg.type === 'interactive-system') {
+                    appendMessage('system', msg.value);
+                }
+                else if (msg.type === 'interactive-error') {
+                    appendMessage('error', msg.value);
+                }
+                else if (msg.type === 'interactive-exit') {
+                    appendMessage('system', 'Process Exited with code ' + msg.code);
+                    setInteractiveStoppedState();
+                }
+                else if (msg.type === 'interactive-stopped') {
+                    setInteractiveStoppedState();
                 }
             });
         </script>
