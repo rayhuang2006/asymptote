@@ -381,7 +381,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             #runBtn:hover { background-color: var(--vscode-button-hoverBackground); }
             #runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-            /* Interactive Column Layout */
+            /* Interactive Split Layout */
             .column-header {
                 display: flex;
                 border-bottom: 1px solid var(--vscode-panel-border);
@@ -390,18 +390,55 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 padding-bottom: 4px;
-                margin-bottom: 5px;
+                margin-bottom: 0px;
             }
-            .col-left { flex: 1; padding-left: 5px; border-right: 1px solid var(--vscode-panel-border); }
-            .col-right { flex: 1; padding-left: 8px; }
+            .col-left { flex: 1; padding-left: 5px; border-right: 1px solid var(--vscode-panel-border); text-align: left; }
+            .col-right { flex: 1; padding-left: 8px; text-align: left; }
 
-            .log-entry { display: flex; width: 100%; border-bottom: 1px dashed var(--vscode-panel-border); }
-            .log-cell { flex: 1; padding: 6px; font-family: var(--vscode-editor-font-family); font-size: 12px; word-wrap: break-word; white-space: pre-wrap; line-height: 1.4; }
-            .log-cell.left { border-right: 1px solid var(--vscode-panel-border); color: var(--vscode-charts-green); }
-            .log-cell.right { color: var(--vscode-textLink-foreground); }
+            .log-container {
+                display: flex;
+                width: 100%;
+                font-family: var(--vscode-editor-font-family); 
+                font-size: 12px; 
+                line-height: 1.4;
+                margin-bottom: 4px;
+            }
             
-            .msg-system { text-align: center; padding: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); width: 100%; font-style: italic; }
-            .msg-error { color: var(--vscode-red); }
+            .log-cell { 
+                width: 50%; 
+                padding: 4px 6px; 
+                word-wrap: break-word; 
+                white-space: pre-wrap;
+                box-sizing: border-box;
+            }
+            .log-cell.left { 
+                border-right: 1px solid var(--vscode-panel-border); 
+                color: var(--vscode-charts-green);
+                text-align: left;
+                display: flex;
+                align-items: center;
+            }
+            .log-cell.right { 
+                color: var(--vscode-textLink-foreground);
+                text-align: left;
+            }
+            .log-cell.error { color: var(--vscode-red); }
+            
+            .msg-system { text-align: center; padding: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); width: 100%; font-style: italic; border-bottom: 1px dashed var(--vscode-panel-border); }
+
+            /* Inline Input Styling */
+            .inline-input {
+                width: 100%;
+                background: transparent;
+                border: none;
+                color: inherit;
+                font-family: inherit;
+                font-size: inherit;
+                outline: none;
+                padding: 0;
+                margin: 0;
+            }
+            .inline-input::placeholder { opacity: 0.5; }
 
         </style>
     </head>
@@ -468,16 +505,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         <div class="col-right">CODE (Output)</div>
                     </div>
 
-                    <div id="chat-history" style="flex:1; overflow-y:auto; border:1px solid var(--vscode-panel-border); margin-bottom:10px; background: var(--vscode-editor-background); border-radius: var(--border-radius); display: flex; flex-direction: column;">
-                        <div class="msg-system" style="margin-top:20px;">Check "Enable Interactive Mode" and click Start.</div>
+                    <div id="chat-history" style="flex:1; overflow-y:auto; border:none; margin-bottom:10px; background: var(--vscode-editor-background); display: flex; flex-direction: column; position: relative;">
+                        <div style="position: absolute; top:0; bottom:0; left:50%; border-left: 1px solid var(--vscode-panel-border); z-index: 0;"></div>
+                        <div class="msg-system" style="z-index: 1;">Check "Enable Interactive Mode" and click Start.</div>
                     </div>
                     
-                    <div style="display:flex; gap:5px; margin-bottom: 5px;">
-                        <input type="text" id="manual-input" class="url-input" placeholder="Type input..." disabled onkeydown="if(event.key==='Enter') sendInput()">
-                        <button id="sendBtn" class="btn-primary" style="width:auto; margin:0;" onclick="sendInput()" disabled>Send</button>
+                    <div id="start-controls" style="margin-top: 5px;">
+                        <button id="interactiveStartBtn" class="btn-primary" onclick="startInteractive()">Start Interactive Session</button>
+                        <button id="interactiveStopBtn" class="btn-outline hidden" style="border-color: var(--vscode-red); color: var(--vscode-red);" onclick="stopInteractive()">Stop Process</button>
                     </div>
-                    <button id="interactiveStartBtn" class="btn-primary" onclick="startInteractive()">Start Interactive Session</button>
-                    <button id="interactiveStopBtn" class="btn-outline hidden" style="border-color: var(--vscode-red); color: var(--vscode-red);" onclick="stopInteractive()">Stop Process</button>
                 </div>
             </div>
         </div>
@@ -495,6 +531,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             const problemContent = document.getElementById('problem-content');
             let testCaseCount = 0;
             let debounceTimer;
+            let activeInputRow = null;
 
             function saveState() {
                 const state = {
@@ -619,14 +656,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             }
 
             function startInteractive() {
-                document.getElementById('chat-history').innerHTML = '';
-                document.getElementById('manual-input').disabled = false;
-                document.getElementById('sendBtn').disabled = false;
-                
+                const history = document.getElementById('chat-history');
+                history.innerHTML = '';
+                // Add vertical line
+                const line = document.createElement('div');
+                line.style.position = 'absolute';
+                line.style.top = '0';
+                line.style.bottom = '0';
+                line.style.left = '50%';
+                line.style.borderLeft = '1px solid var(--vscode-panel-border)';
+                line.style.zIndex = '0';
+                history.appendChild(line);
+
                 document.getElementById('interactiveStartBtn').classList.add('hidden');
                 document.getElementById('interactiveStopBtn').classList.remove('hidden');
                 
+                activeInputRow = null;
                 vscode.postMessage({ command: 'run-interactive' });
+                
+                // Creates initial input row
+                createInputRow();
             }
 
             function stopInteractive() {
@@ -636,20 +685,61 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             }
             
             function setInteractiveStoppedState() {
-                document.getElementById('manual-input').disabled = true;
-                document.getElementById('sendBtn').disabled = true;
                 document.getElementById('interactiveStartBtn').classList.remove('hidden');
                 document.getElementById('interactiveStopBtn').classList.add('hidden');
+                if (activeInputRow) {
+                    activeInputRow.remove();
+                    activeInputRow = null;
+                }
             }
 
-            function sendInput() {
-                const input = document.getElementById('manual-input');
-                const text = input.value;
-                if (!text) return;
+            function createInputRow() {
+                const history = document.getElementById('chat-history');
+                const row = document.createElement('div');
+                row.className = 'log-container';
+                row.style.zIndex = '1';
+
+                const leftCell = document.createElement('div');
+                leftCell.className = 'log-cell left';
                 
-                appendMessage('user', text);
-                vscode.postMessage({ command: 'interactive-input', text: text });
-                input.value = '';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'inline-input';
+                input.placeholder = 'Type here...';
+                input.onkeydown = handleInput;
+                
+                leftCell.appendChild(input);
+                
+                const rightCell = document.createElement('div');
+                rightCell.className = 'log-cell right';
+
+                row.appendChild(leftCell);
+                row.appendChild(rightCell);
+                history.appendChild(row);
+                
+                activeInputRow = row;
+                
+                setTimeout(() => input.focus(), 10);
+                history.scrollTop = history.scrollHeight;
+            }
+
+            function handleInput(event) {
+                if (event.key === 'Enter') {
+                    const text = event.target.value;
+                    if (!text) return;
+                    
+                    // Replace input with text
+                    const parent = event.target.parentElement;
+                    parent.innerHTML = '';
+                    parent.innerText = text;
+                    
+                    activeInputRow = null;
+                    
+                    vscode.postMessage({ command: 'interactive-input', text: text });
+                    
+                    // Create new input row
+                    createInputRow();
+                }
             }
 
             function appendMessage(role, text) {
@@ -658,11 +748,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 if (role === 'system') {
                     const div = document.createElement('div');
                     div.className = 'msg-system';
+                    div.style.zIndex = '1';
                     div.innerText = text;
-                    history.appendChild(div);
+                    
+                    if (activeInputRow) {
+                        history.insertBefore(div, activeInputRow);
+                    } else {
+                        history.appendChild(div);
+                    }
                 } else {
                     const row = document.createElement('div');
-                    row.className = 'log-entry';
+                    row.className = 'log-container';
+                    row.style.zIndex = '1';
                     
                     const leftCell = document.createElement('div');
                     leftCell.className = 'log-cell left';
@@ -670,8 +767,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     const rightCell = document.createElement('div');
                     rightCell.className = 'log-cell right';
                     
-                    if (role === 'user') leftCell.innerText = text;
-                    else if (role === 'solver') rightCell.innerText = text;
+                    if (role === 'solver') rightCell.innerText = text;
                     else if (role === 'error') {
                         rightCell.className += ' msg-error';
                         rightCell.innerText = text;
@@ -679,7 +775,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     
                     row.appendChild(leftCell);
                     row.appendChild(rightCell);
-                    history.appendChild(row);
+                    
+                    if (activeInputRow) {
+                        history.insertBefore(row, activeInputRow);
+                    } else {
+                        history.appendChild(row);
+                    }
                 }
 
                 history.scrollTop = history.scrollHeight;
