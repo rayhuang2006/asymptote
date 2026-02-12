@@ -381,7 +381,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             #runBtn:hover { background-color: var(--vscode-button-hoverBackground); }
             #runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-            /* Interactive Split Layout */
+            /* Toggle Switch CSS */
+            .toggle-switch { position: relative; display: inline-block; width: 34px; height: 18px; margin-right: 10px; }
+            .toggle-switch input { opacity: 0; width: 0; height: 0; }
+            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--vscode-widget-shadow); transition: .4s; border-radius: 34px; }
+            .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+            input:checked + .slider { background-color: var(--vscode-button-background); }
+            input:checked + .slider:before { transform: translateX(16px); }
+
+            /* Interactive Split Layout - Clean Version */
             .column-header {
                 display: flex;
                 border-bottom: 1px solid var(--vscode-panel-border);
@@ -392,8 +400,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 padding-bottom: 4px;
                 margin-bottom: 0px;
             }
-            .col-left { flex: 1; padding-left: 5px; border-right: 1px solid var(--vscode-panel-border); text-align: left; }
-            .col-right { flex: 1; padding-left: 8px; text-align: left; }
+            /* Removing borders for cleaner look */
+            .col-left { flex: 1; padding-left: 5px; text-align: left; opacity: 0.8; }
+            .col-right { flex: 1; padding-left: 8px; text-align: left; opacity: 0.8; }
 
             .log-container {
                 display: flex;
@@ -401,32 +410,32 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 font-family: var(--vscode-editor-font-family); 
                 font-size: 12px; 
                 line-height: 1.4;
-                margin-bottom: 4px;
+                margin-bottom: 2px;
             }
             
             .log-cell { 
                 width: 50%; 
-                padding: 4px 6px; 
+                padding: 2px 6px; 
                 word-wrap: break-word; 
                 white-space: pre-wrap;
                 box-sizing: border-box;
             }
+            
             .log-cell.left { 
-                border-right: 1px solid var(--vscode-panel-border); 
                 color: var(--vscode-charts-green);
                 text-align: left;
-                display: flex;
-                align-items: center;
+                padding-right: 10px; /* gutter */
             }
             .log-cell.right { 
                 color: var(--vscode-textLink-foreground);
                 text-align: left;
+                padding-left: 4px;
             }
             .log-cell.error { color: var(--vscode-red); }
             
             .msg-system { text-align: center; padding: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); width: 100%; font-style: italic; border-bottom: 1px dashed var(--vscode-panel-border); }
 
-            /* Inline Input Styling */
+            /* Inline Input Styling - No Underline */
             .inline-input {
                 width: 100%;
                 background: transparent;
@@ -438,7 +447,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 padding: 0;
                 margin: 0;
             }
-            .inline-input::placeholder { opacity: 0.5; }
+            .inline-input:focus { border: none; outline: none; }
+            .inline-input::placeholder { opacity: 0.4; font-style: italic; }
 
         </style>
     </head>
@@ -488,8 +498,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
             <div id="content-runner" class="content-area">
                 <div style="margin-bottom: 10px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; display: flex; align-items: center;">
-                    <input type="checkbox" id="interactive-mode" onchange="toggleInteractive()" style="margin-right:8px;">
-                    <label for="interactive-mode" style="font-size:12px; cursor:pointer; user-select: none;">Enable Interactive Mode</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="interactive-mode" onchange="toggleInteractive()">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:12px; cursor:pointer; user-select: none;" onclick="document.getElementById('interactive-mode').click()">Interactive Mode</span>
                 </div>
 
                 <div id="standard-runner">
@@ -506,8 +519,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     </div>
 
                     <div id="chat-history" style="flex:1; overflow-y:auto; border:none; margin-bottom:10px; background: var(--vscode-editor-background); display: flex; flex-direction: column; position: relative;">
-                        <div style="position: absolute; top:0; bottom:0; left:50%; border-left: 1px solid var(--vscode-panel-border); z-index: 0;"></div>
-                        <div class="msg-system" style="z-index: 1;">Check "Enable Interactive Mode" and click Start.</div>
+                        <div class="msg-system" style="z-index: 1;">Toggle Interactive Mode ON and click Start.</div>
                     </div>
                     
                     <div id="start-controls" style="margin-top: 5px;">
@@ -658,23 +670,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             function startInteractive() {
                 const history = document.getElementById('chat-history');
                 history.innerHTML = '';
-                // Add vertical line
-                const line = document.createElement('div');
-                line.style.position = 'absolute';
-                line.style.top = '0';
-                line.style.bottom = '0';
-                line.style.left = '50%';
-                line.style.borderLeft = '1px solid var(--vscode-panel-border)';
-                line.style.zIndex = '0';
-                history.appendChild(line);
-
+                
                 document.getElementById('interactiveStartBtn').classList.add('hidden');
                 document.getElementById('interactiveStopBtn').classList.remove('hidden');
                 
                 activeInputRow = null;
                 vscode.postMessage({ command: 'run-interactive' });
                 
-                // Creates initial input row
                 createInputRow();
             }
 
@@ -705,7 +707,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.className = 'inline-input';
-                input.placeholder = 'Type here...';
+                input.placeholder = 'Type input here...';
                 input.onkeydown = handleInput;
                 
                 leftCell.appendChild(input);
@@ -728,7 +730,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     const text = event.target.value;
                     if (!text) return;
                     
-                    // Replace input with text
                     const parent = event.target.parentElement;
                     parent.innerHTML = '';
                     parent.innerText = text;
@@ -737,7 +738,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     
                     vscode.postMessage({ command: 'interactive-input', text: text });
                     
-                    // Create new input row
                     createInputRow();
                 }
             }
