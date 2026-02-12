@@ -47,6 +47,13 @@ A dedicated sidebar for managing test cases without leaving your editor.
 
 ![Runner Demo](images/demo2.gif)
 
+### 3. Interactive Mode (Manual Judge) 🆕
+Struggling with **Interactive Problems** (e.g., `? 1` -> `10`)? You no longer need to write a custom interactor.
+
+* **Split-Column UI:** Left side is You (The Judge), Right side is Your Code.
+* **Inline Input:** Type your response directly in the log flow, just like a terminal.
+* **Automatic Piping:** Asymptote handles the complex process piping for you.
+
 ---
 
 ## 📋 Requirements
@@ -97,6 +104,11 @@ Asymptote is designed to be a helpful companion, not a formal verifier. Please b
 ### 0.1.0 (Planned)
 * **Smart Cache (The Nexus):** Identify code structures via AST fingerprinting. Once you tag a template (e.g., Segment Tree) as $O(\log N)$, Asymptote will remember it forever.
 * **Manual Tagging:** UI to manually correct/annotate complexity for `(?)` functions.
+
+### 0.0.3 (Current)
+* **New:** **Interactive Mode!** Added a split-column runner for testing interactive problems manually.
+* **New:** Inline input interface for a seamless terminal-like experience.
+* **Fix:** Improved UI layout for the runner sidebar.
 
 ### 0.0.2
 * **Fix:** Switched to using system Chrome (`puppeteer-core`) to resolve "Chromium not found" errors on users' machines.
