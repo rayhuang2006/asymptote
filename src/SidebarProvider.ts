@@ -7,6 +7,7 @@ import { Scraper } from "./utils/Scraper";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   _view?: vscode.WebviewView;
+  private currentInteractiveProcess?: cp.ChildProcess;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -42,6 +43,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case "run":
           await this.runTests(data.testCases);
           break;
+        case "run-interactive":
+          await this.runInteractive();
+          break;
+        case "interactive-input":
+          if (this.currentInteractiveProcess && this.currentInteractiveProcess.stdin) {
+            try {
+                this.currentInteractiveProcess.stdin.write(data.text + '\n');
+            } catch (e) {}
+          }
+          break;
+        case "stop-interactive":
+          if (this.currentInteractiveProcess) {
+            this.currentInteractiveProcess.kill();
+            this.currentInteractiveProcess = undefined;
+          }
+          break;
         case "parse-url":
           await this.handleParseUrl(data.url);
           break;
@@ -55,6 +72,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         case "save-state":
             await this._context.workspaceState.update('asymptote-state', data.state);
+            break;
+        case "showError":
+            vscode.window.showErrorMessage(data.text);
             break;
       }
     });
@@ -88,6 +108,75 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           vscode.window.showErrorMessage(`Scraping Failed: ${error.message}`);
           this._view.webview.postMessage({ type: 'status', value: 'Error' });
       }
+  }
+
+  private async runInteractive() {
+    if (!this._view) return;
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showErrorMessage("No active editor found");
+      this._view.webview.postMessage({ type: 'interactive-stopped' });
+      return;
+    }
+
+    await editor.document.save();
+    
+    const filePath = editor.document.fileName;
+    const fileDir = path.dirname(filePath);
+    const fileName = path.basename(filePath, path.extname(filePath));
+    
+    const isWindows = process.platform === "win32";
+    const exeName = isWindows ? `${fileName}.exe` : `${fileName}.out`;
+    const exePath = path.join(fileDir, exeName);
+
+    this._view.webview.postMessage({ type: 'interactive-system', value: 'Compiling...' });
+
+    const compileCommand = `g++ -std=c++17 "${filePath}" -o "${exePath}"`;
+
+    cp.exec(compileCommand, (error, stdout, stderr) => {
+      if (error) {
+        this._view?.webview.postMessage({ 
+          type: 'interactive-error', 
+          value: `Compilation Error:\n${stderr}`
+        });
+        this._view?.webview.postMessage({ type: 'interactive-stopped' });
+        return;
+      }
+
+      this._view?.webview.postMessage({ type: 'interactive-system', value: 'Running Interactive Mode...' });
+
+      if (this.currentInteractiveProcess) {
+          this.currentInteractiveProcess.kill();
+      }
+
+      this.currentInteractiveProcess = cp.spawn(exePath, [], { cwd: fileDir });
+
+      this.currentInteractiveProcess.stdout?.on('data', (data) => {
+          this._view?.webview.postMessage({
+              type: 'interactive-stdout',
+              data: data.toString()
+          });
+      });
+
+      this.currentInteractiveProcess.stderr?.on('data', (data) => {
+          this._view?.webview.postMessage({
+              type: 'interactive-stderr',
+              data: data.toString()
+          });
+      });
+
+      this.currentInteractiveProcess.on('close', (code) => {
+          this._view?.webview.postMessage({
+              type: 'interactive-exit',
+              code: code
+          });
+          this.currentInteractiveProcess = undefined;
+          if (fs.existsSync(exePath)) {
+            try { fs.unlinkSync(exePath); } catch (e) {}
+          }
+      });
+    });
   }
 
   private async runTests(testCases: { input: string; expected: string; id: string }[]) {
@@ -291,6 +380,76 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             #runBtn { background-color: var(--vscode-button-background); color: var(--vscode-button-foreground); margin-top: 10px; width: 100%; border: none; padding: 10px; cursor: pointer; border-radius: var(--border-radius); font-weight: 600; }
             #runBtn:hover { background-color: var(--vscode-button-hoverBackground); }
             #runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+            /* Toggle Switch CSS */
+            .toggle-switch { position: relative; display: inline-block; width: 34px; height: 18px; margin-right: 10px; }
+            .toggle-switch input { opacity: 0; width: 0; height: 0; }
+            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--vscode-widget-shadow); transition: .4s; border-radius: 34px; }
+            .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+            input:checked + .slider { background-color: var(--vscode-button-background); }
+            input:checked + .slider:before { transform: translateX(16px); }
+
+            /* Interactive Split Layout - Clean Version */
+            .column-header {
+                display: flex;
+                border-bottom: 1px solid var(--vscode-panel-border);
+                font-size: 10px;
+                color: var(--vscode-descriptionForeground);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                padding-bottom: 4px;
+                margin-bottom: 0px;
+            }
+            /* Removing borders for cleaner look */
+            .col-left { flex: 1; padding-left: 5px; text-align: left; opacity: 0.8; }
+            .col-right { flex: 1; padding-left: 8px; text-align: left; opacity: 0.8; }
+
+            .log-container {
+                display: flex;
+                width: 100%;
+                font-family: var(--vscode-editor-font-family); 
+                font-size: 12px; 
+                line-height: 1.4;
+                margin-bottom: 2px;
+            }
+            
+            .log-cell { 
+                width: 50%; 
+                padding: 2px 6px; 
+                word-wrap: break-word; 
+                white-space: pre-wrap;
+                box-sizing: border-box;
+            }
+            
+            .log-cell.left { 
+                color: var(--vscode-charts-green);
+                text-align: left;
+                padding-right: 10px; /* gutter */
+            }
+            .log-cell.right { 
+                color: var(--vscode-textLink-foreground);
+                text-align: left;
+                padding-left: 4px;
+            }
+            .log-cell.error { color: var(--vscode-red); }
+            
+            .msg-system { text-align: center; padding: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); width: 100%; font-style: italic; border-bottom: 1px dashed var(--vscode-panel-border); }
+
+            /* Inline Input Styling - No Underline */
+            .inline-input {
+                width: 100%;
+                background: transparent;
+                border: none;
+                color: inherit;
+                font-family: inherit;
+                font-size: inherit;
+                outline: none;
+                padding: 0;
+                margin: 0;
+            }
+            .inline-input:focus { border: none; outline: none; }
+            .inline-input::placeholder { opacity: 0.4; font-style: italic; }
+
         </style>
     </head>
     <body>
@@ -338,9 +497,36 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             </div>
 
             <div id="content-runner" class="content-area">
-                <div id="test-cases-container"></div>
-                <button class="btn-secondary" onclick="addTestCase()">+ Add Case</button>
-                <button id="runBtn" onclick="runTests()">Run All</button>
+                <div style="margin-bottom: 10px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; display: flex; align-items: center;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="interactive-mode" onchange="toggleInteractive()">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size:12px; cursor:pointer; user-select: none;" onclick="document.getElementById('interactive-mode').click()">Interactive Mode</span>
+                </div>
+
+                <div id="standard-runner">
+                    <div id="test-cases-container"></div>
+                    <button class="btn-secondary" onclick="addTestCase()">+ Add Case</button>
+                    <button id="runBtn" onclick="runTests()">Run All</button>
+                </div>
+
+                <div id="interactive-runner" class="hidden" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
+                    
+                    <div class="column-header">
+                        <div class="col-left">JUDGE (Input)</div>
+                        <div class="col-right">CODE (Output)</div>
+                    </div>
+
+                    <div id="chat-history" style="flex:1; overflow-y:auto; border:none; margin-bottom:10px; background: var(--vscode-editor-background); display: flex; flex-direction: column; position: relative;">
+                        <div class="msg-system" style="z-index: 1;">Toggle Interactive Mode ON and click Start.</div>
+                    </div>
+                    
+                    <div id="start-controls" style="margin-top: 5px;">
+                        <button id="interactiveStartBtn" class="btn-primary" onclick="startInteractive()">Start Interactive Session</button>
+                        <button id="interactiveStopBtn" class="btn-outline hidden" style="border-color: var(--vscode-red); color: var(--vscode-red);" onclick="stopInteractive()">Stop Process</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -357,13 +543,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             const problemContent = document.getElementById('problem-content');
             let testCaseCount = 0;
             let debounceTimer;
+            let activeInputRow = null;
 
             function saveState() {
                 const state = {
                     view: 'workspace',
                     tab: document.getElementById('tab-btn-runner').classList.contains('active') ? 'runner' : 'problem',
                     problemHtml: problemContent.innerHTML,
-                    testCases: collectCases()
+                    testCases: collectCases(),
+                    interactive: document.getElementById('interactive-mode').checked
                 };
                 vscode.postMessage({ command: 'save-state', state: state });
             }
@@ -445,7 +633,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             function cloneCase(id, e) { e.stopPropagation(); const o = document.getElementById(id); if(o) addTestCase(o.querySelector('.input-box').value, o.querySelector('.expected-box').value); }
             function updateIndices() { let i = 0; container.querySelectorAll('.test-case').forEach(c => { i++; c.querySelector('.case-number').innerText = '#' + i; }); }
             function runSingleCase(id, e) { e.stopPropagation(); const c = document.getElementById(id); if(!c) return; resetCaseUI(c); vscode.postMessage({ command: 'run', testCases: [{ input: c.querySelector('.input-box').value, expected: c.querySelector('.expected-box').value, id }] }); }
-            function runTests() { const c = collectCases(); if(c.length) sendRunCommand(c); }
+            function runTests() { 
+                const c = collectCases(); 
+                if(c.length) sendRunCommand(c); 
+            }
             function resetCaseUI(c) { c.querySelector('.output-box').value = ''; c.querySelector('.status-tag').innerText = ''; c.querySelector('.time-tag').innerText = ''; c.classList.remove('AC', 'WA', 'collapsed'); }
             function sendRunCommand(c) { runBtn.disabled = true; runBtn.innerText = 'Compiling...'; vscode.postMessage({ command: 'run', testCases: c }); }
             
@@ -459,6 +650,140 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     });
                 });
                 return cases;
+            }
+
+            function toggleInteractive() {
+                const isInteractive = document.getElementById('interactive-mode').checked;
+                const standard = document.getElementById('standard-runner');
+                const interactive = document.getElementById('interactive-runner');
+                
+                if (isInteractive) {
+                    standard.classList.add('hidden');
+                    interactive.classList.remove('hidden');
+                } else {
+                    standard.classList.remove('hidden');
+                    interactive.classList.add('hidden');
+                }
+                triggerSave();
+            }
+
+            function startInteractive() {
+                const history = document.getElementById('chat-history');
+                history.innerHTML = '';
+                
+                document.getElementById('interactiveStartBtn').classList.add('hidden');
+                document.getElementById('interactiveStopBtn').classList.remove('hidden');
+                
+                activeInputRow = null;
+                vscode.postMessage({ command: 'run-interactive' });
+                
+                createInputRow();
+            }
+
+            function stopInteractive() {
+                vscode.postMessage({ command: 'stop-interactive' });
+                appendMessage('system', 'Process Stopped by User.');
+                setInteractiveStoppedState();
+            }
+            
+            function setInteractiveStoppedState() {
+                document.getElementById('interactiveStartBtn').classList.remove('hidden');
+                document.getElementById('interactiveStopBtn').classList.add('hidden');
+                if (activeInputRow) {
+                    activeInputRow.remove();
+                    activeInputRow = null;
+                }
+            }
+
+            function createInputRow() {
+                const history = document.getElementById('chat-history');
+                const row = document.createElement('div');
+                row.className = 'log-container';
+                row.style.zIndex = '1';
+
+                const leftCell = document.createElement('div');
+                leftCell.className = 'log-cell left';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'inline-input';
+                input.placeholder = 'Type input here...';
+                input.onkeydown = handleInput;
+                
+                leftCell.appendChild(input);
+                
+                const rightCell = document.createElement('div');
+                rightCell.className = 'log-cell right';
+
+                row.appendChild(leftCell);
+                row.appendChild(rightCell);
+                history.appendChild(row);
+                
+                activeInputRow = row;
+                
+                setTimeout(() => input.focus(), 10);
+                history.scrollTop = history.scrollHeight;
+            }
+
+            function handleInput(event) {
+                if (event.key === 'Enter') {
+                    const text = event.target.value;
+                    if (!text) return;
+                    
+                    const parent = event.target.parentElement;
+                    parent.innerHTML = '';
+                    parent.innerText = text;
+                    
+                    activeInputRow = null;
+                    
+                    vscode.postMessage({ command: 'interactive-input', text: text });
+                    
+                    createInputRow();
+                }
+            }
+
+            function appendMessage(role, text) {
+                const history = document.getElementById('chat-history');
+                
+                if (role === 'system') {
+                    const div = document.createElement('div');
+                    div.className = 'msg-system';
+                    div.style.zIndex = '1';
+                    div.innerText = text;
+                    
+                    if (activeInputRow) {
+                        history.insertBefore(div, activeInputRow);
+                    } else {
+                        history.appendChild(div);
+                    }
+                } else {
+                    const row = document.createElement('div');
+                    row.className = 'log-container';
+                    row.style.zIndex = '1';
+                    
+                    const leftCell = document.createElement('div');
+                    leftCell.className = 'log-cell left';
+                    
+                    const rightCell = document.createElement('div');
+                    rightCell.className = 'log-cell right';
+                    
+                    if (role === 'solver') rightCell.innerText = text;
+                    else if (role === 'error') {
+                        rightCell.className += ' msg-error';
+                        rightCell.innerText = text;
+                    }
+                    
+                    row.appendChild(leftCell);
+                    row.appendChild(rightCell);
+                    
+                    if (activeInputRow) {
+                        history.insertBefore(row, activeInputRow);
+                    } else {
+                        history.appendChild(row);
+                    }
+                }
+
+                history.scrollTop = history.scrollHeight;
             }
 
             window.addEventListener('message', event => {
@@ -478,6 +803,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                          if (state.testCases) {
                              state.testCases.forEach(c => addTestCase(c.input, c.expected));
                          }
+                         
+                         if (state.interactive) {
+                             document.getElementById('interactive-mode').checked = true;
+                         }
+                         toggleInteractive();
                          
                          switchTab(state.tab || 'runner');
                     }
@@ -517,7 +847,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                      }
                 }
                 else if (msg.type === 'finished') { runBtn.innerText = 'Run All'; runBtn.disabled = false; }
-                else if (msg.type === 'compile-error') { runBtn.innerText = 'Error'; runBtn.disabled = false; alert(msg.output); }
+                else if (msg.type === 'compile-error') { 
+                    runBtn.innerText = 'Error'; 
+                    runBtn.disabled = false; 
+                    vscode.postMessage({ command: 'showError', text: msg.output });
+                }
                 else if (msg.type === 'test-result') {
                     const c = document.getElementById(msg.id);
                     if (c) {
@@ -531,6 +865,25 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         c.classList.remove('AC', 'WA'); c.classList.add(msg.passed ? 'AC' : 'WA');
                         if(msg.passed) c.classList.add('collapsed'); else c.classList.remove('collapsed');
                     }
+                }
+                else if (msg.type === 'interactive-stdout') {
+                    appendMessage('solver', msg.data);
+                }
+                else if (msg.type === 'interactive-stderr') {
+                    appendMessage('error', msg.data);
+                }
+                else if (msg.type === 'interactive-system') {
+                    appendMessage('system', msg.value);
+                }
+                else if (msg.type === 'interactive-error') {
+                    appendMessage('error', msg.value);
+                }
+                else if (msg.type === 'interactive-exit') {
+                    appendMessage('system', 'Process Exited with code ' + msg.code);
+                    setInteractiveStoppedState();
+                }
+                else if (msg.type === 'interactive-stopped') {
+                    setInteractiveStoppedState();
                 }
             });
         </script>
