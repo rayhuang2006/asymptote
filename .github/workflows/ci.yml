@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x' # VS Code extension 通常建議 18 以上
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 如果你的 package.json 有 lint 腳本，把下一行的註解拿掉
+      # - name: Run Lint
+      #   run: npm run lint
+
+      - name: Compile Extension
+        run: npm run compile
