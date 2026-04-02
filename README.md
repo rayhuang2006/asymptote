@@ -11,36 +11,34 @@
 
 <br />
 
-**Asymptote** is a VS Code extension designed to help competitive programmers visualize the theoretical speed of their code *while typing*. It combines a heuristic complexity analyzer with a robust local test runner.
+**Asymptote** is a VS Code extension designed to help competitive programmers visualize the theoretical speed of their code *while typing*. It combines a heuristic complexity analyzer with a robust local test runner. By providing a worst-case estimation instantly, it helps you catch accidental O(N²) or O(2^N) logic before you even compile.
 
-> **⚠️ Note:** The complexity analysis is **heuristic** and based on static analysis patterns. It provides a "worst-case estimation" to help you catch O(N^2) or O(2^N) slips before submission, but it is not a formal mathematical proof.
+> **Supported Language:** Asymptote currently supports **C++** exclusively.
 
 ---
 
-## How It Helps You During a Contest
+## Quick Start
 
-1.  **Write Code:** Focus on your logic in C++.
-2.  **Instant Analysis:** See a **worst-case time complexity** estimation directly above your function.
-3.  **Sanity Check:** Catch accidental O(N^2) or O(2^N) logic before you even compile.
-4.  **Local Runner:** Parse problems from Codeforces and run samples locally without switching windows.
+1. Install **Asymptote** from the VS Code Marketplace.
+2. Open any `.cpp` file.
+3. Start coding! The complexity CodeLens will automatically appear above your functions.
+4. Use the sidebar to parse Codeforces problems and run local tests.
 
 ---
 
 ## Features
 
 ### 1. Real-time Complexity Analysis (CodeLens)
-See the Big O notation directly above your C++ functions. Asymptote parses your AST (Abstract Syntax Tree) to estimate time complexity.
+See the Big O notation directly above your C++ functions. Asymptote parses your AST (Abstract Syntax Tree) to estimate time complexity dynamically.
 
-* **Algebraic Awareness:** Understands that nested loops multiply (N * M).
-* **Confidence System:** Marks analysis with `(?)` if unknown functions are detected.
+* **Algebraic Awareness:** Understands that nested loops multiply (e.g., N * M).
+* **Confidence System:** Marks analysis with `(?)` if unknown functions or opaque external calls are detected.
 * **Toggleable:** Use `Asymptote: Toggle Complexity Lens` to show/hide the analysis instantly.
 
 ![Complexity Analysis Demo](images/demo1.gif)
 
-### 2. The Runner (Sidekick)
-A dedicated sidebar for managing test cases without leaving your editor.
-
-> 💡 **Concept:** Think of it as a lightweight **Codeforces local judge** built directly into VS Code.
+### 2. Local Judge (Runner)
+A dedicated sidebar for managing test cases without leaving your editor—acting as a lightweight Codeforces local judge built directly into VS Code.
 
 * **Problem Parsing:** One-click import from **Codeforces**. Fetches title, limits, and sample cases.
 * **Local Execution:** Compiles and runs your code against inputs.
@@ -58,14 +56,22 @@ Struggling with **Interactive Problems** (e.g., `? 1` -> `10`)? You no longer ne
 
 ---
 
+## Known Limitations
+
+Asymptote's complexity analyzer uses static AST parsing and heuristics, which means it provides estimations, not formal mathematical proofs. 
+* **Recursion & Master Theorem:** Complex recursive trees or divide-and-conquer algorithms might not be fully resolvable.
+* **Dynamic Early Exits:** While it detects `break` and `return`, complex conditional early exits (like randomized algorithms) might overestimate the worst-case scenario.
+
+---
+
 ## Requirements
 
-To use the **Runner** feature, you need:
+To use the **Local Judge** feature, you need:
 
 * **C++ Compiler (GCC/G++)**: Must be installed and accessible in your system's PATH.
-* **Browser**: **Google Chrome, Microsoft Edge, or Brave** is required for parsing problems from online judges. Asymptote will automatically locate your system installation.
+* **Browser**: **Google Chrome, Microsoft Edge, or Brave**. Asymptote requires a local browser executable to silently scrape and parse problem limits and test cases from Codeforces securely. 
 
-> *Note: The Complexity Analysis features work out-of-the-box without any external dependencies.*
+> *Note: The Complexity Analysis (CodeLens) works entirely offline and out-of-the-box without any external dependencies.*
 
 ---
 
@@ -81,9 +87,9 @@ You can customize Asymptote via the Command Palette or VS Code Settings:
 
 ## Future Roadmap
 
-* **Manual Tagging & Community Rules:** UI to manually correct and annotate complexity for `(?)` functions, establishing a solid rule base.
-* **Smart Cache (The Nexus):** Identify code structures via AST fingerprinting. Once a template is tagged, Asymptote remembers it.
-* **AI Integration:** Incorporate LLMs to assist in evaluating complex algorithms that fall outside static analysis heuristics.
+* **Manual Tagging & Community Rules:** UI to manually correct and annotate complexity for `(?)` functions, establishing a solid foundational rule base before introducing AI.
+* **Smart Cache (The Nexus):** Identify code structures via AST fingerprinting. Once a template is manually tagged, Asymptote remembers it globally.
+* **Local LLM Integration:** After establishing the manual rule base, we plan to integrate local models to evaluate edge-case algorithms that fall outside static tree-sitter heuristics.
 
 ---
 
@@ -95,7 +101,7 @@ This project uses an automated CI/CD pipeline. All version history, release note
 
 ## Contributing
 
-We welcome contributions! Asymptote follows a modern, automated development workflow:
+Contributions are welcome! Asymptote follows a modern, automated development workflow:
 
 1. Fork the repository and create your feature branch (`git checkout -b feature/amazing-feature`).
 2. Commit your changes following the **[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)** specification (e.g., `feat: add awesome feature`, `fix: resolve crash`). This is required for our automated release system.
