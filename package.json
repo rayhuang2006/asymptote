@@ -3,7 +3,7 @@
   "publisher": "rayhuang2006",
   "displayName": "Asymptote: Competitive Programming",
   "description": "A competitive programming companion.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
@@ -76,6 +76,11 @@
           "type": "string",
           "default": "",
           "description": "Custom path to Google Chrome executable for the parser."
+        },
+        "asymptote.strictComparison": {
+          "type": "boolean",
+          "default": false,
+          "description": "If enabled, test cases will require an exact character-for-character match (including trailing whitespaces and newlines)."
         }
       }
     }

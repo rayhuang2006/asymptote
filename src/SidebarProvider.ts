@@ -188,6 +188,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const config = vscode.workspace.getConfiguration("asymptote");
+    const isStrict = config.get<boolean>("strictComparison", false);
+
     await editor.document.save();
     
     const filePath = editor.document.fileName;
@@ -222,7 +225,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           }
 
           const expected = testCases[i].expected;
-          const passed = expected ? finalOutput.trim() === expected.trim() : false;
+          let passed = false;
+          if (expected){
+            if (isStrict) {
+                passed = finalOutput === expected;
+            }else{
+                passed = finalOutput.trim() === expected.trim();
+            }
+          }
 
           this._view?.webview.postMessage({
               type: 'test-result',
