@@ -4,6 +4,8 @@ import puppeteer from 'puppeteer-core';
 import { addExtra } from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 const chromeFinder = require('chrome-finder');
+import * as fs from 'fs';
+import * as os from 'os';
 
 export interface ParsedProblem {
     title: string;
@@ -29,18 +31,22 @@ export class Scraper {
             }
 
             if (!executablePath) {
+                executablePath = this.getBrowserExecutablePath() || '';
+            }
+
+            if (!executablePath) {
                 const selection = await vscode.window.showErrorMessage(
-                    "Asymptote needs Google Chrome to parse problems. Please select your Chrome executable.",
-                    "Locate Chrome", "Cancel"
+                    "Asymptote needs Chrome, Edge, or Brave to parse problems. Please select your browser executable.",
+                    "Locate Browser", "Cancel"
                 );
 
-                if (selection === "Locate Chrome") {
+                if (selection === "Locate Browser") {
                     const fileUri = await vscode.window.showOpenDialog({
                         canSelectFiles: true,
                         canSelectFolders: false,
                         canSelectMany: false,
                         filters: { 'Executables': ['exe', 'app', ''] },
-                        openLabel: "Select Chrome"
+                        openLabel: "Select Browser"
                     });
 
                     if (fileUri && fileUri[0]) {
@@ -54,7 +60,7 @@ export class Scraper {
             }
 
             if (!executablePath) {
-                throw new Error("Chrome path not found. Cannot parse.");
+                throw new Error("Browser path not found. Cannot parse.");
             }
 
             const puppeteerExtra = addExtra(puppeteer);
@@ -214,5 +220,39 @@ export class Scraper {
             htmlContent,
             testCases
         };
+    }
+
+    private static getBrowserExecutablePath(): string | null {
+        const platform = os.platform();
+        let paths: string[] = [];
+
+        if (platform === 'darwin') {
+            paths = [
+                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+                '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+            ];
+        } else if (platform === 'win32') {
+            paths = [
+                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+                'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+            ];
+        } else if (platform === 'linux') {
+            paths = [
+                '/usr/bin/google-chrome',
+                '/usr/bin/microsoft-edge',
+                '/usr/bin/brave-browser'
+            ];
+        }
+
+        for (const p of paths) {
+            if (fs.existsSync(p)) {
+                return p;
+            }
+        }
+
+        return null;
     }
 }
