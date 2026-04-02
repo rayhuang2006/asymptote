@@ -4,6 +4,13 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.1](https://github.com/rayhuang2006/asymptote/compare/v0.2.0...v0.2.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* integrate vsce publish into release workflow ([9e08ce0](https://github.com/rayhuang2006/asymptote/commit/9e08ce03719bc08c4bb7c2cab4264b4fceaff2a2))
+
 ## [0.2.0](https://github.com/rayhuang2006/asymptote/compare/v0.1.0...v0.2.0) (2026-04-02)
 
 
