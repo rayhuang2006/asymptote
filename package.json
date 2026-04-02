@@ -92,7 +92,8 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test:vscode": "vscode-test",
-    "test": "mocha -r ts-node/register/transpile-only tests/**/*.test.ts"
+    "test": "mocha -r ts-node/register/transpile-only tests/**/*.test.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -101,6 +102,8 @@
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "mocha": "^11.7.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
@@ -114,5 +117,10 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "web-tree-sitter": "^0.20.8"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix"
+    ]
   }
 }
