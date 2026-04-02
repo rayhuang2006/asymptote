@@ -17,7 +17,7 @@
 
 ---
 
-## 🚦 How It Helps You During a Contest
+## How It Helps You During a Contest
 
 1.  **Write Code:** Focus on your logic in C++.
 2.  **Instant Analysis:** See a **worst-case time complexity** estimation directly above your function.
@@ -26,7 +26,7 @@
 
 ---
 
-## ✨ Features
+## Features
 
 ### 1. Real-time Complexity Analysis (CodeLens)
 See the Big O notation directly above your C++ functions. Asymptote parses your AST (Abstract Syntax Tree) to estimate time complexity.
@@ -58,7 +58,7 @@ Struggling with **Interactive Problems** (e.g., `? 1` -> `10`)? You no longer ne
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 To use the **Runner** feature, you need:
 
@@ -69,7 +69,7 @@ To use the **Runner** feature, you need:
 
 ---
 
-## ⚙️ Extension Settings
+## Extension Settings
 
 You can customize Asymptote via the Command Palette or VS Code Settings:
 
@@ -79,7 +79,7 @@ You can customize Asymptote via the Command Palette or VS Code Settings:
 
 ---
 
-## 🚀 Future Roadmap
+## Future Roadmap
 
 * **Manual Tagging & Community Rules:** UI to manually correct and annotate complexity for `(?)` functions, establishing a solid rule base.
 * **Smart Cache (The Nexus):** Identify code structures via AST fingerprinting. Once a template is tagged, Asymptote remembers it.
@@ -87,13 +87,13 @@ You can customize Asymptote via the Command Palette or VS Code Settings:
 
 ---
 
-## 📝 Release Notes & Changelog
+## Release Notes & Changelog
 
 This project uses an automated CI/CD pipeline. All version history, release notes, and updates are automatically generated and maintained in the [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Asymptote follows a modern, automated development workflow:
 
@@ -102,6 +102,6 @@ We welcome contributions! Asymptote follows a modern, automated development work
 3. Push to the branch (`git push origin feature/amazing-feature`).
 4. Submit a Pull Request.
 
-## 📄 License
+## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
