@@ -4,6 +4,13 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.0](https://github.com/rayhuang2006/asymptote/compare/v0.1.0...v0.2.0) (2026-04-02)
+
+
+### Features
+
+* complete AST analyzer testing infrastructure ([#13](https://github.com/rayhuang2006/asymptote/issues/13)) ([a2c62fe](https://github.com/rayhuang2006/asymptote/commit/a2c62fe44f919bea67e35e4a07c6dbc3e6ccc93f))
+
 ## [0.1.0](https://github.com/rayhuang2006/asymptote/compare/v0.0.5...v0.1.0) (2026-04-02)
 
 
