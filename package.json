@@ -91,7 +91,8 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test:vscode": "vscode-test",
+    "test": "mocha -r ts-node/register/transpile-only tests/**/*.test.ts"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -100,6 +101,8 @@
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.2",
+    "mocha": "^11.7.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.52.0"
   },
