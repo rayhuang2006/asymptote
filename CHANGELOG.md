@@ -4,6 +4,13 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.0](https://github.com/rayhuang2006/asymptote/compare/v0.2.1...v0.3.0) (2026-04-09)
+
+
+### Features
+
+* add Python and Java support for complexity analysis (resolves [#5](https://github.com/rayhuang2006/asymptote/issues/5)) ([#17](https://github.com/rayhuang2006/asymptote/issues/17)) ([7dfcec3](https://github.com/rayhuang2006/asymptote/commit/7dfcec36c047b1d16fdf5bae259e773f62fda1c0))
+
 ## [0.2.1](https://github.com/rayhuang2006/asymptote/compare/v0.2.0...v0.2.1) (2026-04-02)
 
 
