@@ -17,7 +17,9 @@
   ],
   "activationEvents": [
     "onLanguage:cpp",
-    "onLanguage:c"
+    "onLanguage:c",
+    "onLanguage:python",
+    "onLanguage:java"
   ],
   "main": "./out/extension.js",
   "contributes": {
