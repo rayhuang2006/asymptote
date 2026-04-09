@@ -81,7 +81,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleParseUrl(url: string) {
-      if (!this._view) return;
+      if (!this._view) {return;}
 
       this._view.webview.postMessage({ type: 'status', value: 'Fetching...' });
 
@@ -110,8 +110,39 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       }
   }
 
+  private getExecutionStrategy(filePath: string, fileDir: string, fileName: string) {
+      const ext = path.extname(filePath).toLowerCase();
+      const isWindows = process.platform === "win32";
+      
+      if (ext === '.py') {
+          const pyCmd = isWindows ? 'python' : 'python3';
+          return {
+              compileCommand: undefined,
+              runCommand: pyCmd,
+              runArgs: [filePath],
+              cleanupFiles: []
+          };
+      } else if (ext === '.java') {
+          return {
+              compileCommand: `javac "${filePath}"`,
+              runCommand: 'java',
+              runArgs: [fileName],
+              cleanupFiles: [path.join(fileDir, `${fileName}.class`)]
+          };
+      } else {
+          const exeName = isWindows ? `${fileName}.exe` : `${fileName}.out`;
+          const exePath = path.join(fileDir, exeName);
+          return {
+              compileCommand: `g++ -std=c++17 "${filePath}" -o "${exePath}"`,
+              runCommand: exePath,
+              runArgs: [],
+              cleanupFiles: [exePath]
+          };
+      }
+  }
+
   private async runInteractive() {
-    if (!this._view) return;
+    if (!this._view) {return;}
 
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -126,31 +157,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const fileDir = path.dirname(filePath);
     const fileName = path.basename(filePath, path.extname(filePath));
     
-    const isWindows = process.platform === "win32";
-    const exeName = isWindows ? `${fileName}.exe` : `${fileName}.out`;
-    const exePath = path.join(fileDir, exeName);
+    const strategy = this.getExecutionStrategy(filePath, fileDir, fileName);
 
-    this._view.webview.postMessage({ type: 'interactive-system', value: 'Compiling...' });
-
-    const compileCommand = `g++ -std=c++17 "${filePath}" -o "${exePath}"`;
-
-    cp.exec(compileCommand, (error, stdout, stderr) => {
-      if (error) {
-        this._view?.webview.postMessage({ 
-          type: 'interactive-error', 
-          value: `Compilation Error:\n${stderr}`
-        });
-        this._view?.webview.postMessage({ type: 'interactive-stopped' });
-        return;
-      }
-
+    const executeAndSpawn = () => {
       this._view?.webview.postMessage({ type: 'interactive-system', value: 'Running Interactive Mode...' });
 
       if (this.currentInteractiveProcess) {
           this.currentInteractiveProcess.kill();
       }
 
-      this.currentInteractiveProcess = cp.spawn(exePath, [], { cwd: fileDir });
+      this.currentInteractiveProcess = cp.spawn(strategy.runCommand, strategy.runArgs, { cwd: fileDir });
 
       this.currentInteractiveProcess.stdout?.on('data', (data) => {
           this._view?.webview.postMessage({
@@ -172,11 +188,30 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
               code: code
           });
           this.currentInteractiveProcess = undefined;
-          if (fs.existsSync(exePath)) {
-            try { fs.unlinkSync(exePath); } catch (e) {}
-          }
+          strategy.cleanupFiles.forEach(f => {
+              if (fs.existsSync(f)) {
+                  try { fs.unlinkSync(f); } catch (e) {}
+              }
+          });
       });
-    });
+    };
+
+    if (strategy.compileCommand) {
+        this._view.webview.postMessage({ type: 'interactive-system', value: 'Compiling...' });
+        cp.exec(strategy.compileCommand, { cwd: fileDir }, (error, stdout, stderr) => {
+            if (error) {
+                this._view?.webview.postMessage({ 
+                  type: 'interactive-error', 
+                  value: `Compilation Error:\n${stderr}`
+                });
+                this._view?.webview.postMessage({ type: 'interactive-stopped' });
+                return;
+            }
+            executeAndSpawn();
+        });
+    } else {
+        executeAndSpawn();
+    }
   }
 
   private async runTests(testCases: { input: string; expected: string; id: string }[]) {
@@ -197,65 +232,70 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const fileDir = path.dirname(filePath);
     const fileName = path.basename(filePath, path.extname(filePath));
     
-    const isWindows = process.platform === "win32";
-    const exeName = isWindows ? `${fileName}.exe` : `${fileName}.out`;
-    const exePath = path.join(fileDir, exeName);
+    const strategy = this.getExecutionStrategy(filePath, fileDir, fileName);
 
-    this._view.webview.postMessage({ type: 'status', value: 'Compiling...' });
+    const runAllTestCases = async () => {
+        this._view?.webview.postMessage({ type: 'status', value: 'Running...' });
 
-    const compileCommand = `g++ -std=c++17 "${filePath}" -o "${exePath}"`;
-
-    cp.exec(compileCommand, async (error, stdout, stderr) => {
-      if (error) {
-        this._view?.webview.postMessage({ 
-          type: 'compile-error', 
-          output: `Compilation Error:\n${stderr}`
-        });
-        return;
-      }
-
-      this._view?.webview.postMessage({ type: 'status', value: 'Running...' });
-
-      for (let i = 0; i < testCases.length; i++) {
-          const result = await this.runBinary(exePath, fileDir, testCases[i].input, 2000);
-          
-          let finalOutput = result.output;
-          if (result.error) {
-              finalOutput += `\n[Stderr]:\n${result.error}`;
-          }
-
-          const expected = testCases[i].expected;
-          let passed = false;
-          if (expected){
-            if (isStrict) {
-                passed = finalOutput === expected;
-            }else{
-                passed = finalOutput.trim() === expected.trim();
+        for (let i = 0; i < testCases.length; i++) {
+            const result = await this.runBinary(strategy.runCommand, strategy.runArgs, fileDir, testCases[i].input, 2000);
+            
+            let finalOutput = result.output;
+            if (result.error) {
+                finalOutput += `\n[Stderr]:\n${result.error}`;
             }
+
+            const expected = testCases[i].expected;
+            let passed = false;
+            if (expected){
+              if (isStrict) {
+                  passed = finalOutput === expected;
+              }else{
+                  passed = finalOutput.trim() === expected.trim();
+              }
+            }
+
+            this._view?.webview.postMessage({
+                type: 'test-result',
+                id: testCases[i].id,
+                output: finalOutput,
+                passed: passed,
+                time: result.time,
+                isError: result.code !== 0 || result.isTimeout,
+                statusText: result.isTimeout ? 'TLE' : (result.code !== 0 ? 'RE' : (passed ? 'AC' : 'WA'))
+            });
+        }
+
+        this._view?.webview.postMessage({ type: 'finished' });
+
+        strategy.cleanupFiles.forEach(f => {
+            if (fs.existsSync(f)) {
+                try { fs.unlinkSync(f); } catch (e) {}
+            }
+        });
+    };
+
+    if (strategy.compileCommand) {
+        this._view.webview.postMessage({ type: 'status', value: 'Compiling...' });
+
+        cp.exec(strategy.compileCommand, { cwd: fileDir }, async (error, stdout, stderr) => {
+          if (error) {
+            this._view?.webview.postMessage({ 
+              type: 'compile-error', 
+              output: `Compilation Error:\n${stderr}`
+            });
+            return;
           }
-
-          this._view?.webview.postMessage({
-              type: 'test-result',
-              id: testCases[i].id,
-              output: finalOutput,
-              passed: passed,
-              time: result.time,
-              isError: result.code !== 0 || result.isTimeout,
-              statusText: result.isTimeout ? 'TLE' : (result.code !== 0 ? 'RE' : (passed ? 'AC' : 'WA'))
-          });
-      }
-
-      this._view?.webview.postMessage({ type: 'finished' });
-
-      if (fs.existsSync(exePath)) {
-        try { fs.unlinkSync(exePath); } catch (e) {}
-      }
-    });
+          await runAllTestCases();
+        });
+    } else {
+        await runAllTestCases();
+    }
   }
 
-  private runBinary(exePath: string, cwd: string, input: string, timeoutMs: number): Promise<{ output: string, error: string, code: number | null, isTimeout: boolean, time: number }> {
+  private runBinary(command: string, args: string[], cwd: string, input: string, timeoutMs: number): Promise<{ output: string, error: string, code: number | null, isTimeout: boolean, time: number }> {
       return new Promise((resolve) => {
-          const child = cp.spawn(exePath, [], { cwd });
+          const child = cp.spawn(command, args, { cwd });
           let output = "";
           let error = "";
           let isTimeout = false;
