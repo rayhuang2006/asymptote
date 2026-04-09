@@ -328,179 +328,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "main.css"));
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "main.js"));
+    const nonce = getNonce();
+
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; img-src ${webview.cspSource} https: data:;">
         <title>Asymptote</title>
-        <script>
+        <script nonce="${nonce}">
             window.MathJax = {
                 tex: { 
-                    inlineMath: [['$', '$'], ['$$$', '$$$'], ['\\\\(', '\\\\)']], 
-                    displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] 
+                    inlineMath: [['}, '}], ['$}, '$}], ['\\\\(', '\\\\)']], 
+                    displayMath: [['$', '$'], ['\\\\[', '\\\\]']] 
                 },
                 svg: { fontCache: 'global' }
             };
         </script>
         <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-        
-        <style>
-            :root { --vscode-green: #4EC9B0; --vscode-red: #F14C4C; --border-radius: 4px; }
-            body { font-family: var(--vscode-font-family); background-color: var(--vscode-sideBar-background); color: var(--vscode-editor-foreground); padding: 0; margin: 0; overflow-x: hidden;}
-            
-            .hidden { display: none !important; }
-            
-            .home-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 90vh; text-align: center; padding: 20px; }
-            
-            .logo { margin-bottom: 20px; opacity: 0.9; }
-            
-            .home-title { font-size: 18px; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
-            .btn-primary { width: 100%; border: none; padding: 10px; cursor: pointer; font-size: 13px; border-radius: var(--border-radius); font-weight: 600; transition: all 0.2s; background-color: var(--vscode-button-background); color: var(--vscode-button-foreground); margin-bottom: 10px; }
-            .btn-primary:hover { background-color: var(--vscode-button-hoverBackground); }
-            .btn-outline { width: 100%; border: 1px solid var(--vscode-panel-border); padding: 10px; cursor: pointer; font-size: 13px; border-radius: var(--border-radius); font-weight: 600; transition: all 0.2s; background: transparent; color: var(--vscode-foreground); margin-bottom: 10px; }
-            .btn-outline:hover { background: var(--vscode-list-hoverBackground); }
-            
-            .parse-section { margin-top: 20px; width: 100%; text-align: left; padding: 15px; background: var(--vscode-list-hoverBackground); border-radius: 8px; border: 1px solid var(--vscode-panel-border); }
-            .input-group { margin-bottom: 12px; }
-            .input-label { display: block; font-size: 11px; margin-bottom: 4px; opacity: 0.8; }
-            .url-input { width: 100%; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px; box-sizing: border-box; }
-
-            .workspace-header { 
-                background-color: var(--vscode-sideBar-background);
-                position: sticky; top: 0; z-index: 10;
-                border-bottom: 1px solid var(--vscode-panel-border);
-            }
-            .nav-bar { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--vscode-panel-border); }
-            .back-btn { background: none; border: none; color: var(--vscode-descriptionForeground); cursor: pointer; font-size: 12px; display: flex; align-items: center; padding: 0; }
-            .back-btn:hover { color: var(--vscode-foreground); }
-
-            .tabs { display: flex; width: 100%; }
-            .tab { 
-                flex: 1; text-align: center; padding: 8px 0; cursor: pointer; 
-                font-size: 11px; font-weight: 600; text-transform: uppercase;
-                border-bottom: 2px solid transparent; opacity: 0.6;
-                transition: all 0.2s;
-            }
-            .tab:hover { opacity: 1; background-color: var(--vscode-list-hoverBackground); }
-            .tab.active { 
-                border-bottom-color: var(--vscode-panelTitle-activeBorder); 
-                color: var(--vscode-panelTitle-activeForeground); 
-                opacity: 1; 
-            }
-
-            .content-area { padding: 10px; height: calc(100vh - 80px); overflow-y: auto; }
-            
-            #problem-content { line-height: 1.5; font-size: 13px; }
-            #problem-content h2, #problem-content h3 { margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 4px; }
-            #problem-content p { margin-bottom: 10px; }
-            #problem-content pre { background: var(--vscode-textBlockQuote-background); padding: 5px; overflow-x: auto; }
-            
-            .test-case { background-color: var(--vscode-list-hoverBackground); border-left: 3px solid transparent; margin-bottom: 10px; border-radius: var(--border-radius); overflow: hidden; transition: all 0.2s ease; }
-            .case-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; cursor: pointer; user-select: none; font-size: 12px; font-weight: 600; }
-            .case-header:hover { background-color: var(--vscode-list-activeSelectionBackground); }
-            .case-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
-            .test-case:hover .case-actions { opacity: 1; }
-            .case-body { padding: 10px; border-top: 1px solid var(--vscode-panel-border); display: block; }
-            .collapsed .case-body { display: none; }
-            
-            .status-tag { font-size: 11px; font-weight: bold; margin-left: 8px; }
-            .time-tag { font-size: 10px; color: var(--vscode-descriptionForeground); margin-left: 5px; opacity: 0.8; }
-            .status-AC { color: var(--vscode-green); }
-            .status-WA, .status-RE, .status-TLE { color: var(--vscode-red); }
-            .test-case.AC { border-left-color: var(--vscode-green); }
-            .test-case.WA { border-left-color: var(--vscode-red); }
-
-            textarea { 
-                width: 100%; background-color: var(--vscode-input-background); 
-                color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); 
-                padding: 6px; box-sizing: border-box; margin-bottom: 8px; 
-                font-family: var(--vscode-editor-font-family); font-size: 12px; 
-                resize: none; min-height: 40px; overflow-y: hidden;
-            }
-            textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
-            .label { font-size: 10px; margin-bottom: 2px; color: var(--vscode-descriptionForeground); display: block; text-transform: uppercase; letter-spacing: 0.5px; }
-
-            .btn-secondary { width: 100%; background: transparent; color: var(--vscode-textLink-foreground); border: 1px dashed var(--vscode-panel-border); margin-top: 10px; padding: 8px; cursor: pointer; border-radius: var(--border-radius); }
-            .btn-secondary:hover { background-color: var(--vscode-list-hoverBackground); border-color: var(--vscode-textLink-foreground); }
-            .btn-icon { background: none; color: var(--vscode-descriptionForeground); padding: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 3px; border: none; cursor: pointer; }
-            .btn-icon:hover { color: var(--vscode-editor-foreground); background: rgba(255,255,255,0.1); }
-            .btn-icon svg { width: 14px; height: 14px; fill: currentColor; }
-            
-            #runBtn { background-color: var(--vscode-button-background); color: var(--vscode-button-foreground); margin-top: 10px; width: 100%; border: none; padding: 10px; cursor: pointer; border-radius: var(--border-radius); font-weight: 600; }
-            #runBtn:hover { background-color: var(--vscode-button-hoverBackground); }
-            #runBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-            /* Toggle Switch CSS */
-            .toggle-switch { position: relative; display: inline-block; width: 34px; height: 18px; margin-right: 10px; }
-            .toggle-switch input { opacity: 0; width: 0; height: 0; }
-            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--vscode-widget-shadow); transition: .4s; border-radius: 34px; }
-            .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
-            input:checked + .slider { background-color: var(--vscode-button-background); }
-            input:checked + .slider:before { transform: translateX(16px); }
-
-            /* Interactive Split Layout - Clean Version */
-            .column-header {
-                display: flex;
-                border-bottom: 1px solid var(--vscode-panel-border);
-                font-size: 10px;
-                color: var(--vscode-descriptionForeground);
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                padding-bottom: 4px;
-                margin-bottom: 0px;
-            }
-            /* Removing borders for cleaner look */
-            .col-left { flex: 1; padding-left: 5px; text-align: left; opacity: 0.8; }
-            .col-right { flex: 1; padding-left: 8px; text-align: left; opacity: 0.8; }
-
-            .log-container {
-                display: flex;
-                width: 100%;
-                font-family: var(--vscode-editor-font-family); 
-                font-size: 12px; 
-                line-height: 1.4;
-                margin-bottom: 2px;
-            }
-            
-            .log-cell { 
-                width: 50%; 
-                padding: 2px 6px; 
-                word-wrap: break-word; 
-                white-space: pre-wrap;
-                box-sizing: border-box;
-            }
-            
-            .log-cell.left { 
-                color: var(--vscode-charts-green);
-                text-align: left;
-                padding-right: 10px; /* gutter */
-            }
-            .log-cell.right { 
-                color: var(--vscode-textLink-foreground);
-                text-align: left;
-                padding-left: 4px;
-            }
-            .log-cell.error { color: var(--vscode-red); }
-            
-            .msg-system { text-align: center; padding: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); width: 100%; font-style: italic; border-bottom: 1px dashed var(--vscode-panel-border); }
-
-            /* Inline Input Styling - No Underline */
-            .inline-input {
-                width: 100%;
-                background: transparent;
-                border: none;
-                color: inherit;
-                font-family: inherit;
-                font-size: inherit;
-                outline: none;
-                padding: 0;
-                margin: 0;
-            }
-            .inline-input:focus { border: none; outline: none; }
-            .inline-input::placeholder { opacity: 0.4; font-style: italic; }
-
-        </style>
+        <link href="${styleUri}" rel="stylesheet">
     </head>
     <body>
         <div id="home-view" class="home-container">
@@ -514,8 +363,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             <div class="home-title">ASYMPTOTE</div>
             
             <div id="main-menu" style="width: 100%">
-                <button class="btn-primary" onclick="showParseUI()">Import from URL</button>
-                <button class="btn-outline" onclick="manualStart()">Manual Create</button>
+                <button id="btn-import-url" class="btn-primary">Import from URL</button>
+                <button id="btn-manual-create" class="btn-outline">Manual Create</button>
             </div>
 
             <div id="parse-ui" class="parse-section hidden">
@@ -523,22 +372,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     <span class="input-label">Problem URL</span>
                     <input type="text" id="problem-url" class="url-input" placeholder="https://codeforces.com/..." />
                 </div>
-                <button id="fetchBtn" class="btn-primary" style="margin-top:10px" onclick="startParsing()">Fetch</button>
-                <button class="btn-outline" onclick="hideParseUI()" style="padding: 6px;">Cancel</button>
+                <button id="fetchBtn" class="btn-primary" style="margin-top:10px">Fetch</button>
+                <button id="btn-cancel-parse" class="btn-outline" style="padding: 6px;">Cancel</button>
             </div>
         </div>
 
         <div id="workspace-view" class="hidden">
             <div class="workspace-header">
                 <div class="nav-bar">
-                    <button class="back-btn" onclick="goHome()">
+                    <button id="btn-gohome" class="back-btn">
                         <svg viewBox="0 0 16 16" style="width:12px;height:12px;margin-right:4px;fill:currentColor;"><path d="M10 12L4 8l6-4v8z"/></svg>
                         Home
                     </button>
                 </div>
                 <div class="tabs">
-                    <div id="tab-btn-problem" class="tab" onclick="switchTab('problem')">Problem</div>
-                    <div id="tab-btn-runner" class="tab active" onclick="switchTab('runner')">Runner</div>
+                    <div id="tab-btn-problem" class="tab">Problem</div>
+                    <div id="tab-btn-runner" class="tab active">Runner</div>
                 </div>
             </div>
 
@@ -549,16 +398,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             <div id="content-runner" class="content-area">
                 <div style="margin-bottom: 10px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; display: flex; align-items: center;">
                     <label class="toggle-switch">
-                        <input type="checkbox" id="interactive-mode" onchange="toggleInteractive()">
+                        <input type="checkbox" id="interactive-mode">
                         <span class="slider"></span>
                     </label>
-                    <span style="font-size:12px; cursor:pointer; user-select: none;" onclick="document.getElementById('interactive-mode').click()">Interactive Mode</span>
+                    <span id="btn-interactive-mode-text" style="font-size:12px; cursor:pointer; user-select: none;">Interactive Mode</span>
                 </div>
 
                 <div id="standard-runner">
                     <div id="test-cases-container"></div>
-                    <button class="btn-secondary" onclick="addTestCase()">+ Add Case</button>
-                    <button id="runBtn" onclick="runTests()">Run All</button>
+                    <button id="btn-add-case" class="btn-secondary">+ Add Case</button>
+                    <button id="runBtn">Run All</button>
                 </div>
 
                 <div id="interactive-runner" class="hidden" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
@@ -573,371 +422,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     </div>
                     
                     <div id="start-controls" style="margin-top: 5px;">
-                        <button id="interactiveStartBtn" class="btn-primary" onclick="startInteractive()">Start Interactive Session</button>
-                        <button id="interactiveStopBtn" class="btn-outline hidden" style="border-color: var(--vscode-red); color: var(--vscode-red);" onclick="stopInteractive()">Stop Process</button>
+                        <button id="interactiveStartBtn" class="btn-primary">Start Interactive Session</button>
+                        <button id="interactiveStopBtn" class="btn-outline hidden" style="border-color: var(--vscode-red); color: var(--vscode-red);">Stop Process</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <script>
-            const vscode = acquireVsCodeApi();
-            
-            const homeView = document.getElementById('home-view');
-            const workspaceView = document.getElementById('workspace-view');
-            const mainMenu = document.getElementById('main-menu');
-            const parseUI = document.getElementById('parse-ui');
-            const container = document.getElementById('test-cases-container');
-            const runBtn = document.getElementById('runBtn');
-            const fetchBtn = document.getElementById('fetchBtn');
-            const problemContent = document.getElementById('problem-content');
-            let testCaseCount = 0;
-            let debounceTimer;
-            let activeInputRow = null;
-
-            function saveState() {
-                const state = {
-                    view: 'workspace',
-                    tab: document.getElementById('tab-btn-runner').classList.contains('active') ? 'runner' : 'problem',
-                    problemHtml: problemContent.innerHTML,
-                    testCases: collectCases(),
-                    interactive: document.getElementById('interactive-mode').checked
-                };
-                vscode.postMessage({ command: 'save-state', state: state });
-            }
-
-            function triggerSave() {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(saveState, 500);
-            }
-
-            function showParseUI() { mainMenu.classList.add('hidden'); parseUI.classList.remove('hidden'); }
-            function hideParseUI() { parseUI.classList.add('hidden'); mainMenu.classList.remove('hidden'); }
-            function manualStart() { 
-                vscode.postMessage({ command: 'manual-create' }); 
-            }
-            function startParsing() {
-                const url = document.getElementById('problem-url').value;
-                if(!url) return;
-                fetchBtn.disabled = true;
-                fetchBtn.innerText = 'Fetching...';
-                vscode.postMessage({ command: 'parse-url', url: url });
-            }
-            function goHome() {
-                container.innerHTML = ''; testCaseCount = 0;
-                workspaceView.classList.add('hidden'); homeView.classList.remove('hidden'); hideParseUI();
-                fetchBtn.disabled = false; fetchBtn.innerText = 'Fetch';
-                vscode.postMessage({ command: 'save-state', state: null }); 
-            }
-
-            function switchTab(tabName) {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.getElementById('tab-btn-' + tabName).classList.add('active');
-                document.getElementById('content-problem').classList.add('hidden');
-                document.getElementById('content-runner').classList.add('hidden');
-                document.getElementById('content-' + tabName).classList.remove('hidden');
-
-                if (tabName === 'runner') {
-                    setTimeout(() => {
-                        document.querySelectorAll('textarea').forEach(autoResize);
-                    }, 50);
-                }
-                triggerSave();
-            }
-
-            function autoResize(el) {
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
-            }
-
-            function addTestCase(inputVal = '', expectedVal = '') {
-                testCaseCount++;
-                const id = 'case-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                const div = document.createElement('div');
-                div.className = 'test-case'; div.id = id;
-                div.innerHTML = \`
-                    <div class="case-header" onclick="toggleCase(this)">
-                        <div><span class="case-number">#</span><span class="status-tag"></span><span class="time-tag"></span></div>
-                        <div class="case-actions">
-                            <button class="btn-icon" onclick="runSingleCase('\${id}', event)" title="Run This"><svg viewBox="0 0 16 16"><path d="M4 2v12l10-6L4 2z"/></svg></button>
-                            <button class="btn-icon" onclick="cloneCase('\${id}', event)" title="Clone"><svg viewBox="0 0 16 16"><path d="M4 4h8v8H4z M12 2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z m2 2v8h-1V4h1z m-2 0H4v8h8V4z"/></svg></button>
-                            <button class="btn-icon" onclick="removeTestCase(this, event)" title="Remove"><svg viewBox="0 0 16 16"><path d="M13.854 2.146a.5.5 0 0 1 0 .708l-11 11a.5.5 0 0 1-.708-.708l11-11a.5.5 0 0 1 .708 0Z"/><path d="M2.146 2.146a.5.5 0 0 0 0 .708l11 11a.5.5 0 0 0 .708-.708l-11-11a.5.5 0 0 0-.708 0Z"/></svg></button>
-                        </div>
-                    </div>
-                    <div class="case-body">
-                        <span class="label">Input</span><textarea class="input-box" rows="2" oninput="autoResize(this); triggerSave()">\${inputVal}</textarea>
-                        <span class="label">Expected</span><textarea class="expected-box" rows="2" oninput="autoResize(this); triggerSave()">\${expectedVal}</textarea>
-                        <span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>
-                    </div>\`;
-                container.appendChild(div); 
-                updateIndices();
-                triggerSave();
-                
-                setTimeout(() => {
-                    div.querySelectorAll('textarea').forEach(autoResize);
-                }, 0);
-            }
-
-            function toggleCase(h) { h.parentElement.classList.toggle('collapsed'); }
-            function removeTestCase(b, e) { e.stopPropagation(); b.closest('.test-case').remove(); updateIndices(); triggerSave(); }
-            function cloneCase(id, e) { e.stopPropagation(); const o = document.getElementById(id); if(o) addTestCase(o.querySelector('.input-box').value, o.querySelector('.expected-box').value); }
-            function updateIndices() { let i = 0; container.querySelectorAll('.test-case').forEach(c => { i++; c.querySelector('.case-number').innerText = '#' + i; }); }
-            function runSingleCase(id, e) { e.stopPropagation(); const c = document.getElementById(id); if(!c) return; resetCaseUI(c); vscode.postMessage({ command: 'run', testCases: [{ input: c.querySelector('.input-box').value, expected: c.querySelector('.expected-box').value, id }] }); }
-            function runTests() { 
-                const c = collectCases(); 
-                if(c.length) sendRunCommand(c); 
-            }
-            function resetCaseUI(c) { c.querySelector('.output-box').value = ''; c.querySelector('.status-tag').innerText = ''; c.querySelector('.time-tag').innerText = ''; c.classList.remove('AC', 'WA', 'collapsed'); }
-            function sendRunCommand(c) { runBtn.disabled = true; runBtn.innerText = 'Compiling...'; vscode.postMessage({ command: 'run', testCases: c }); }
-            
-            function collectCases() {
-                const cases = [];
-                container.querySelectorAll('.test-case').forEach(c => {
-                    cases.push({
-                        input: c.querySelector('.input-box').value,
-                        expected: c.querySelector('.expected-box').value,
-                        id: c.id
-                    });
-                });
-                return cases;
-            }
-
-            function toggleInteractive() {
-                const isInteractive = document.getElementById('interactive-mode').checked;
-                const standard = document.getElementById('standard-runner');
-                const interactive = document.getElementById('interactive-runner');
-                
-                if (isInteractive) {
-                    standard.classList.add('hidden');
-                    interactive.classList.remove('hidden');
-                } else {
-                    standard.classList.remove('hidden');
-                    interactive.classList.add('hidden');
-                }
-                triggerSave();
-            }
-
-            function startInteractive() {
-                const history = document.getElementById('chat-history');
-                history.innerHTML = '';
-                
-                document.getElementById('interactiveStartBtn').classList.add('hidden');
-                document.getElementById('interactiveStopBtn').classList.remove('hidden');
-                
-                activeInputRow = null;
-                vscode.postMessage({ command: 'run-interactive' });
-                
-                createInputRow();
-            }
-
-            function stopInteractive() {
-                vscode.postMessage({ command: 'stop-interactive' });
-                appendMessage('system', 'Process Stopped by User.');
-                setInteractiveStoppedState();
-            }
-            
-            function setInteractiveStoppedState() {
-                document.getElementById('interactiveStartBtn').classList.remove('hidden');
-                document.getElementById('interactiveStopBtn').classList.add('hidden');
-                if (activeInputRow) {
-                    activeInputRow.remove();
-                    activeInputRow = null;
-                }
-            }
-
-            function createInputRow() {
-                const history = document.getElementById('chat-history');
-                const row = document.createElement('div');
-                row.className = 'log-container';
-                row.style.zIndex = '1';
-
-                const leftCell = document.createElement('div');
-                leftCell.className = 'log-cell left';
-                
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'inline-input';
-                input.placeholder = 'Type input here...';
-                input.onkeydown = handleInput;
-                
-                leftCell.appendChild(input);
-                
-                const rightCell = document.createElement('div');
-                rightCell.className = 'log-cell right';
-
-                row.appendChild(leftCell);
-                row.appendChild(rightCell);
-                history.appendChild(row);
-                
-                activeInputRow = row;
-                
-                setTimeout(() => input.focus(), 10);
-                history.scrollTop = history.scrollHeight;
-            }
-
-            function handleInput(event) {
-                if (event.key === 'Enter') {
-                    const text = event.target.value;
-                    if (!text) return;
-                    
-                    const parent = event.target.parentElement;
-                    parent.innerHTML = '';
-                    parent.innerText = text;
-                    
-                    activeInputRow = null;
-                    
-                    vscode.postMessage({ command: 'interactive-input', text: text });
-                    
-                    createInputRow();
-                }
-            }
-
-            function appendMessage(role, text) {
-                const history = document.getElementById('chat-history');
-                
-                if (role === 'system') {
-                    const div = document.createElement('div');
-                    div.className = 'msg-system';
-                    div.style.zIndex = '1';
-                    div.innerText = text;
-                    
-                    if (activeInputRow) {
-                        history.insertBefore(div, activeInputRow);
-                    } else {
-                        history.appendChild(div);
-                    }
-                } else {
-                    const row = document.createElement('div');
-                    row.className = 'log-container';
-                    row.style.zIndex = '1';
-                    
-                    const leftCell = document.createElement('div');
-                    leftCell.className = 'log-cell left';
-                    
-                    const rightCell = document.createElement('div');
-                    rightCell.className = 'log-cell right';
-                    
-                    if (role === 'solver') rightCell.innerText = text;
-                    else if (role === 'error') {
-                        rightCell.className += ' msg-error';
-                        rightCell.innerText = text;
-                    }
-                    
-                    row.appendChild(leftCell);
-                    row.appendChild(rightCell);
-                    
-                    if (activeInputRow) {
-                        history.insertBefore(row, activeInputRow);
-                    } else {
-                        history.appendChild(row);
-                    }
-                }
-
-                history.scrollTop = history.scrollHeight;
-            }
-
-            window.addEventListener('message', event => {
-                const msg = event.data;
-                
-                if (msg.type === 'restore-state') {
-                    const state = msg.state;
-                    if (state && state.view === 'workspace') {
-                         homeView.classList.add('hidden');
-                         workspaceView.classList.remove('hidden');
-                         problemContent.innerHTML = state.problemHtml || '';
-                         
-                         if (window.MathJax) {
-                            setTimeout(() => { window.MathJax.typesetPromise([problemContent]); }, 100);
-                         }
-                         
-                         if (state.testCases) {
-                             state.testCases.forEach(c => addTestCase(c.input, c.expected));
-                         }
-                         
-                         if (state.interactive) {
-                             document.getElementById('interactive-mode').checked = true;
-                         }
-                         toggleInteractive();
-                         
-                         switchTab(state.tab || 'runner');
-                    }
-                }
-                else if (msg.type === 'navigate') {
-                    if (msg.view === 'workspace') {
-                        homeView.classList.add('hidden');
-                        workspaceView.classList.remove('hidden');
-                        
-                        problemContent.innerHTML = msg.problemHtml || '';
-                        
-                        if (window.MathJax) {
-                            setTimeout(() => {
-                                window.MathJax.typesetPromise([problemContent]);
-                            }, 100);
-                        }
-
-                        switchTab(msg.tab || 'runner');
-
-                        if (msg.initialData) {
-                            msg.initialData.forEach(c => addTestCase(c.input, c.expected));
-                        } else {
-                            addTestCase();
-                        }
-                        triggerSave();
-                    }
-                } 
-                else if (msg.type === 'status') {
-                     if (msg.value === 'Fetching...') {
-                         fetchBtn.innerText = 'Fetching...';
-                         fetchBtn.disabled = true;
-                     } else if (msg.value === 'Error') {
-                         fetchBtn.innerText = 'Fetch';
-                         fetchBtn.disabled = false;
-                     } else {
-                         runBtn.innerText = msg.value;
-                     }
-                }
-                else if (msg.type === 'finished') { runBtn.innerText = 'Run All'; runBtn.disabled = false; }
-                else if (msg.type === 'compile-error') { 
-                    runBtn.innerText = 'Error'; 
-                    runBtn.disabled = false; 
-                    vscode.postMessage({ command: 'showError', text: msg.output });
-                }
-                else if (msg.type === 'test-result') {
-                    const c = document.getElementById(msg.id);
-                    if (c) {
-                        const outBox = c.querySelector('.output-box');
-                        outBox.value = msg.output;
-                        autoResize(outBox);
-                        
-                        c.querySelector('.time-tag').innerText = Math.round(msg.time) + 'ms';
-                        const s = c.querySelector('.status-tag');
-                        s.innerText = msg.statusText; s.className = 'status-tag status-' + msg.statusText;
-                        c.classList.remove('AC', 'WA'); c.classList.add(msg.passed ? 'AC' : 'WA');
-                        if(msg.passed) c.classList.add('collapsed'); else c.classList.remove('collapsed');
-                    }
-                }
-                else if (msg.type === 'interactive-stdout') {
-                    appendMessage('solver', msg.data);
-                }
-                else if (msg.type === 'interactive-stderr') {
-                    appendMessage('error', msg.data);
-                }
-                else if (msg.type === 'interactive-system') {
-                    appendMessage('system', msg.value);
-                }
-                else if (msg.type === 'interactive-error') {
-                    appendMessage('error', msg.value);
-                }
-                else if (msg.type === 'interactive-exit') {
-                    appendMessage('system', 'Process Exited with code ' + msg.code);
-                    setInteractiveStoppedState();
-                }
-                else if (msg.type === 'interactive-stopped') {
-                    setInteractiveStoppedState();
-                }
-            });
-        </script>
+        <script nonce="${nonce}" src="${scriptUri}"></script>
     </body>
     </html>`;
   }
+}
+
+function getNonce() {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }
