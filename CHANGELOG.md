@@ -4,6 +4,13 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.4.1](https://github.com/rayhuang2006/asymptote/compare/v0.4.0...v0.4.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* disable visual debug mode and restore headless operation ([#35](https://github.com/rayhuang2006/asymptote/issues/35)) ([70378f0](https://github.com/rayhuang2006/asymptote/commit/70378f0f922307bfeed01c61c313a832fb014433))
+
 ## [0.4.0](https://github.com/rayhuang2006/asymptote/compare/v0.3.0...v0.4.0) (2026-04-09)
 
 
