@@ -65,11 +65,9 @@ export class Scraper {
             }
 
             browser = await puppeteer.launch({
-                headless: false,
-                defaultViewport: null,
-                devtools: true,
+                headless: true,
                 executablePath: executablePath,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized']
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
 
             const page = await browser.newPage();
