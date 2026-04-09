@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer-core';
-import { addExtra } from 'puppeteer-extra';
+import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 const chromeFinder = require('chrome-finder');
+
+puppeteer.use(StealthPlugin());
 import * as fs from 'fs';
 import * as os from 'os';
 
@@ -63,20 +64,36 @@ export class Scraper {
                 throw new Error("Browser path not found. Cannot parse.");
             }
 
-            const puppeteerExtra = addExtra(puppeteer);
-            puppeteerExtra.use(StealthPlugin());
-
-            browser = await puppeteerExtra.launch({
-                headless: true,
+            browser = await puppeteer.launch({
+                headless: false,
+                defaultViewport: null,
+                devtools: true,
                 executablePath: executablePath,
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized']
             });
 
             const page = await browser.newPage();
             await page.setViewport({ width: 1920, height: 1080 });
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36');
+
+            const cfClearance = vscode.workspace.getConfiguration('asymptote').get<string>('cfClearance');
+            if (cfClearance) {
+                await page.setCookie({
+                    name: 'cf_clearance',
+                    value: cfClearance,
+                    domain: '.codeforces.com'
+                });
+            }
 
             await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+            if (url.includes('codeforces.com')) {
+                try {
+                    await page.waitForSelector('.problem-statement', { timeout: 60000 });
+                } catch (e) {
+                    throw new Error("Timeout waiting for problem statement (Network/Cloudflare too slow)");
+                }
+            }
 
             const content = await page.content();
             const $ = cheerio.load(content);
@@ -194,8 +211,8 @@ export class Scraper {
         const timeMatch = infoText.match(/Time Limit:\s*(\d+\s*s)/i);
         const memMatch = infoText.match(/Memory Limit:\s*(\d+\s*MB)/i);
         
-        if (timeMatch) timeLimit = timeMatch[1];
-        if (memMatch) memoryLimit = memMatch[1];
+        if (timeMatch) {timeLimit = timeMatch[1];}
+        if (memMatch) {memoryLimit = memMatch[1];}
 
         const testCases: { input: string; expected: string; id: string }[] = [];
         

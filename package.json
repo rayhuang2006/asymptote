@@ -83,6 +83,11 @@
           "type": "boolean",
           "default": false,
           "description": "If enabled, test cases will require an exact character-for-character match (including trailing whitespaces and newlines)."
+        },
+        "asymptote.cfClearance": {
+          "type": "string",
+          "default": "",
+          "description": "Codeforces cf_clearance cookie value for bypassing Cloudflare."
         }
       }
     }
