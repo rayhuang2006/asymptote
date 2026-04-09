@@ -12,14 +12,25 @@ const MAX_LINE_COUNT = 5000;
 export async function activate(context: vscode.ExtensionContext) {
     try {
         await Parser.init();
-        const parser = new Parser();
-        const wasmPath = path.join(context.extensionPath, 'parsers', 'tree-sitter-cpp.wasm');
-        const Lang = await Parser.Language.load(wasmPath);
-        parser.setLanguage(Lang);
+        const parsersPath = path.join(context.extensionPath, 'parsers');
+        
+        const cppLang = await Parser.Language.load(path.join(parsersPath, 'tree-sitter-cpp.wasm'));
+        const pythonLang = await Parser.Language.load(path.join(parsersPath, 'tree-sitter-python.wasm'));
+        const javaLang = await Parser.Language.load(path.join(parsersPath, 'tree-sitter-java.wasm'));
 
-        const codelensProvider = new AsymptoteCodeLensProvider(parser, Lang);
+        const cppParser = new Parser(); cppParser.setLanguage(cppLang);
+        const pythonParser = new Parser(); pythonParser.setLanguage(pythonLang);
+        const javaParser = new Parser(); javaParser.setLanguage(javaLang);
 
-        vscode.languages.registerCodeLensProvider(['cpp', 'c'], codelensProvider);
+        const cppProvider = new AsymptoteCodeLensProvider(cppParser, cppLang, 'cpp');
+        const pythonProvider = new AsymptoteCodeLensProvider(pythonParser, pythonLang, 'python');
+        const javaProvider = new AsymptoteCodeLensProvider(javaParser, javaLang, 'java');
+
+        vscode.languages.registerCodeLensProvider(['cpp', 'c'], cppProvider);
+        vscode.languages.registerCodeLensProvider(['python'], pythonProvider);
+        vscode.languages.registerCodeLensProvider(['java'], javaProvider);
+
+        const providers = [cppProvider, pythonProvider, javaProvider];
 
         const sidebarProvider = new SidebarProvider(context.extensionUri, context);
         context.subscriptions.push(
@@ -27,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
         );
 
         context.subscriptions.push(vscode.commands.registerCommand('asymptote.refreshComplexity', () => {
-            codelensProvider.refresh();
+            providers.forEach(p => p.refresh());
         }));
         
         context.subscriptions.push(vscode.commands.registerCommand('asymptote.openRunner', () => {
@@ -42,7 +53,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
             if (e.affectsConfiguration('asymptote.enableCodeLens')) {
-                codelensProvider.refresh();
+                providers.forEach(p => p.refresh());
             }
         }));
 
@@ -58,10 +69,12 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
     public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
     private parser: any;
     private lang: any;
+    private languageId: string;
 
-    constructor(parser: any, lang: any) {
+    constructor(parser: any, lang: any, languageId: string) {
         this.parser = parser;
         this.lang = lang;
+        this.languageId = languageId;
     }
 
     public provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
@@ -78,14 +91,32 @@ class AsymptoteCodeLensProvider implements vscode.CodeLensProvider {
         const text = document.getText();
         const tree = this.parser.parse(text);
         
-        const query = this.lang.query(`
-            (function_definition
-                declarator: (function_declarator
-                    declarator: (identifier) @func_name
+        let queryString = '';
+        if (this.languageId === 'python') {
+            queryString = `
+                (function_definition
+                    name: (identifier) @func_name
+                    body: (block) @func_body
                 )
-                body: (compound_statement) @func_body
-            )
-        `);
+            `;
+        } else if (this.languageId === 'java') {
+            queryString = `
+                (method_declaration
+                    name: (identifier) @func_name
+                    body: (block) @func_body
+                )
+            `;
+        } else {
+            queryString = `
+                (function_definition
+                    declarator: (function_declarator
+                        declarator: (identifier) @func_name
+                    )
+                    body: (compound_statement) @func_body
+                )
+            `;
+        }
+        const query = this.lang.query(queryString);
 
         const matches = query.matches(tree.rootNode);
 

@@ -72,19 +72,22 @@ export function analyzeBlock(node: any, funcName: string): { complexity: Complex
 }
 
 export function isLoop(node: any): boolean {
-    return node.type === 'for_statement' || node.type === 'while_statement' || node.type === 'do_statement';
+    return node.type === 'for_statement' || 
+           node.type === 'while_statement' || 
+           node.type === 'do_statement' ||
+           node.type === 'enhanced_for_statement';
 }
 
 export function getFunctionCallComplexity(node: any): { complexity: Complexity, reason: string } {
     const text = node.text;
     
-    if (text.includes('sort(') || text.includes('stable_sort(')) {
+    if (text.includes('sort(') || text.includes('stable_sort(') || text.includes('sorted(')) {
         return { complexity: new Complexity(1, 1), reason: `Call: sort (O(N log N))` };
     }
-    if (text.includes('lower_bound(') || text.includes('upper_bound(') || text.includes('binary_search(')) {
+    if (text.includes('lower_bound(') || text.includes('upper_bound(') || text.includes('binary_search(') || text.includes('binarySearch(')) {
         return { complexity: new Complexity(0, 1), reason: `Call: binary search (O(log N))` };
     }
-    if (text.includes('push_back(') || text.includes('pop_back(') || text.includes('max(') || text.includes('min(')) {
+    if (text.includes('push_back(') || text.includes('pop_back(') || text.includes('max(') || text.includes('min(') || text.includes('append(') || text.includes('.add(')) {
          return { complexity: new Complexity(0, 0), reason: `Call: O(1) op` };
     }
 
@@ -147,10 +150,10 @@ export function analyzeRecursion(node: any, funcName: string): string | null {
     };
     traverse(node);
 
-    if (callCount === 0) return null;
-    if (callCount >= 2) return "O(2^N)";
-    if (hasDivision) return "O(log N)";
-    if (hasSubtraction) return "O(N)";
+    if (callCount === 0) {return null;}
+    if (callCount >= 2) {return "O(2^N)";}
+    if (hasDivision) {return "O(log N)";}
+    if (hasSubtraction) {return "O(N)";}
     return "O(N)"; 
 }
 
