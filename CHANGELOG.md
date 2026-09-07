@@ -4,6 +4,13 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.5.0](https://github.com/rayhuang2006/asymptote/compare/v0.4.1...v0.5.0) (2026-09-07)
+
+
+### Features
+
+* complete complexity correctness foundation ([#37](https://github.com/rayhuang2006/asymptote/issues/37)) ([fff2fbf](https://github.com/rayhuang2006/asymptote/commit/fff2fbfd6d5bdb2523ebdaedd5beeb4ae1ed7e90))
+
 ## [0.4.1](https://github.com/rayhuang2006/asymptote/compare/v0.4.0...v0.4.1) (2026-04-09)
 
 
