@@ -32,6 +32,31 @@ describe('Complexity model baseline', () => {
         assert.strictEqual(result.toString(), 'O( N M )');
     });
 
+    it('preserves independent symbols when adding sequential work', () => {
+        const result = Complexity.variable('n').add(Complexity.variable('m'));
+
+        assert.strictEqual(result.toString(), 'O( N + M )');
+    });
+
+    it('removes dominated terms from sequential work', () => {
+        const linear = Complexity.variable('n');
+        const sorting = Complexity.variable('n').multiply(Complexity.logarithmic('n'));
+
+        assert.strictEqual(linear.add(sorting).toString(), 'O( N log N )');
+    });
+
+    it('distributes multiplication across independent sequential terms', () => {
+        const sum = Complexity.variable('n').add(Complexity.variable('m'));
+
+        assert.strictEqual(Complexity.variable('k').multiply(sum).toString(), 'O( N K + K M )');
+    });
+
+    it('takes roots of symbolic products', () => {
+        const product = Complexity.variable('n').multiply(Complexity.variable('m'));
+
+        assert.strictEqual(product.root(2).toString(), 'O( √N √M )');
+    });
+
     it('orders the supported asymptotic forms', () => {
         assert.ok(new Complexity(0, 1).compare(new Complexity()) > 0);
         assert.ok(new Complexity(1).compare(new Complexity(0, 4)) > 0);
@@ -115,6 +140,119 @@ describe('AST analyzer regression baseline', () => {
         assert.strictEqual(result.complexity.toString(), 'O( N M )');
     });
 
+    it('adds independent bounds for sequential loops', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n; i++) {
+                    first[i]++;
+                }
+                for (int j = 0; j < m; j++) {
+                    second[j]++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N + M )');
+    });
+
+    it('does not mark container construction as an unknown function call', () => {
+        const result = analyze(`
+            int test() {
+                int n, m;
+                vector<int> first(n), second(m);
+                for (int i = 0; i < n; i++) cin >> first[i];
+                for (int j = 0; j < m; j++) cin >> second[j];
+                return 0;
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N + M )');
+        assert.strictEqual(result.complexity.isEstimate, false);
+    });
+
+    it('simplifies repeated sequential work over the same bound', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n; i++) first[i]++;
+                for (int j = 0; j < n; j++) second[j]++;
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N )');
+    });
+
+    it('analyzes nested loops without compound-statement bodies', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n; i++)
+                    for (int j = 0; j < m; j++)
+                        answer++;
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N M )');
+    });
+
+    it('recognizes square-root loop conditions', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 1; i * i <= n; i++) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( √N )');
+    });
+
+    it('extracts a symbol from an arithmetic loop bound', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n - 1; i++) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N )');
+    });
+
+    it('preserves products used as loop bounds', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n * m; i++) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N M )');
+    });
+
+    it('preserves sums used as loop bounds', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n + m; i++) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N + M )');
+    });
+
+    it('uses a container name for size-based loop bounds', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < values.size(); i++) {
+                    answer += values[i];
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( VALUES )');
+    });
+
     it('uses the symbolic bound for logarithmic loops', () => {
         const result = analyze(`
             void test() {
@@ -139,6 +277,31 @@ describe('AST analyzer regression baseline', () => {
         assert.strictEqual(result.complexity.toString(), 'O( N )');
     });
 
+    it('supports loop variables declared before the for-loop', () => {
+        const result = analyze(`
+            void test() {
+                int i;
+                for (i = 0; i < m; i++) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( M )');
+    });
+
+    it('uses the collection name for C++ range-based loops', () => {
+        const result = analyze(`
+            void test() {
+                for (const auto& value : values) {
+                    answer += value;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( VALUES )');
+    });
+
     it('recognizes a shrinking while-loop as logarithmic', () => {
         const result = analyze(`
             void test() {
@@ -151,7 +314,7 @@ describe('AST analyzer regression baseline', () => {
         assert.strictEqual(result.complexity.toString(), 'O( log N )');
     });
 
-    it('keeps the existing binary-search fingerprint behavior', () => {
+    it('recognizes binary-search loop structure without a global fingerprint', () => {
         const result = analyze(`
             void test() {
                 int left = 0;
@@ -168,6 +331,21 @@ describe('AST analyzer regression baseline', () => {
         `, 'cpp');
 
         assert.strictEqual(result.complexity.toString(), 'O( log N )');
+    });
+
+    it('does not mistake unrelated division inside a while-loop for binary search', () => {
+        const result = analyze(`
+            void test() {
+                int i = 0;
+                while (i < n) {
+                    int half = value / 2;
+                    if (half > 0) answer++;
+                    i += 1;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N )');
     });
 
     it('recognizes standard sorting work', () => {
@@ -222,6 +400,26 @@ def test(values):
         assert.strictEqual(result.complexity.toString(), 'O( N log N )');
     });
 
+    it('preserves the bound used by Python range', () => {
+        const result = analyze(`
+def test(m):
+    for i in range(m):
+        answer += i
+        `, 'python');
+
+        assert.strictEqual(result.complexity.toString(), 'O( M )');
+    });
+
+    it('treats a constant Python range as constant work', () => {
+        const result = analyze(`
+def test():
+    for i in range(100):
+        answer += i
+        `, 'python');
+
+        assert.strictEqual(result.complexity.toString(), 'O( 1 )');
+    });
+
     it('recognizes Java enhanced for-loops as linear', () => {
         const result = analyze(`
             void test(int[] values) {
@@ -231,17 +429,37 @@ def test(values):
             }
         `, 'java');
 
-        assert.strictEqual(result.complexity.toString(), 'O( N )');
+        assert.strictEqual(result.complexity.toString(), 'O( VALUES )');
+    });
+
+    it('preserves symbolic bounds in classic Java for-loops', () => {
+        const result = analyze(`
+            void test(int m) {
+                for (int i = 0; i < m; i++) {
+                    answer++;
+                }
+            }
+        `, 'java');
+
+        assert.strictEqual(result.complexity.toString(), 'O( M )');
+    });
+
+    it('treats fixed classic Java for-loops as constant work', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < 100; i++) {
+                    answer++;
+                }
+            }
+        `, 'java');
+
+        assert.strictEqual(result.complexity.toString(), 'O( 1 )');
     });
 });
 
-describe('Target analyzer behavior', () => {
-    // These roadmap specifications remain pending until the complexity model
-    // and analyzer can represent their expected results.
-
-    it.skip('represents square-root loop bounds', () => {
-        // for (i = 1; i * i <= n; i++) should be O(sqrt(N)).
-    });
+describe('Post-v0.5 analyzer roadmap', () => {
+    // These specifications belong to the call-graph and recurrence milestones,
+    // not the v0.5 correctness foundation.
 
     it.skip('propagates complexity through user-defined function calls', () => {
         // A caller of a locally defined O(N) helper should include that O(N) work.

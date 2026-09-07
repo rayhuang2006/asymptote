@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { SidebarProvider } from './SidebarProvider';
-import { AlgorithmRegistry } from './analyzer/AlgorithmRegistry';
-import { Complexity } from './analyzer/Complexity';
 import { analyzeBlock } from './analyzer/ASTAnalyzer';
 
 const Parser = require('web-tree-sitter');
