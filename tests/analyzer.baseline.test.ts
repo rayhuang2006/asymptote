@@ -13,6 +13,7 @@ describe('Complexity model baseline', () => {
         assert.strictEqual(new Complexity(1).toString(), 'O( N )');
         assert.strictEqual(new Complexity(2).toString(), 'O( N² )');
         assert.strictEqual(new Complexity(1, 1).toString(), 'O( N log N )');
+        assert.strictEqual(new Complexity(0, 2).toString(), 'O( (log N)² )');
         assert.strictEqual(new Complexity(0, 0, true).toString(), 'O( 2ᴺ )');
     });
 
@@ -23,6 +24,12 @@ describe('Complexity model baseline', () => {
 
         assert.strictEqual(result.toString(), 'O( N log N ) (?)');
         assert.strictEqual(result.isEstimate, true);
+    });
+
+    it('preserves independent symbols when multiplying work', () => {
+        const result = Complexity.variable('n').multiply(Complexity.variable('m'));
+
+        assert.strictEqual(result.toString(), 'O( N M )');
     });
 
     it('orders the supported asymptotic forms', () => {
@@ -80,11 +87,82 @@ describe('AST analyzer regression baseline', () => {
         assert.strictEqual(result.complexity.toString(), 'O( log N )');
     });
 
+    it('treats a fixed-bound loop as constant time', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < 100; i++) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( 1 )');
+    });
+
+    it('preserves independent bounds in nested loops', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < m; j++) {
+                        if (values[j] > 0) {
+                            answer++;
+                        }
+                    }
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N M )');
+    });
+
+    it('uses the symbolic bound for logarithmic loops', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = 1; i < m; i *= 2) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( log M )');
+    });
+
+    it('uses the initializer as the bound for descending loops', () => {
+        const result = analyze(`
+            void test() {
+                for (int i = n; i > 0; i -= 2) {
+                    answer++;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( N )');
+    });
+
     it('recognizes a shrinking while-loop as logarithmic', () => {
         const result = analyze(`
             void test() {
                 while (n > 1) {
                     n /= 2;
+                }
+            }
+        `, 'cpp');
+
+        assert.strictEqual(result.complexity.toString(), 'O( log N )');
+    });
+
+    it('keeps the existing binary-search fingerprint behavior', () => {
+        const result = analyze(`
+            void test() {
+                int left = 0;
+                int right = n - 1;
+                while (left <= right) {
+                    int middle = left + (right - left) / 2;
+                    if (values[middle] < target) {
+                        left = middle + 1;
+                    } else {
+                        right = middle - 1;
+                    }
                 }
             }
         `, 'cpp');
@@ -158,16 +236,8 @@ def test(values):
 });
 
 describe('Target analyzer behavior', () => {
-    // These executable specifications intentionally remain pending until the
-    // complexity expression and analyzer can represent their expected results.
-
-    it.skip('distinguishes independent N and M loop bounds', () => {
-        // for (i < n) for (j < m) should be O(NM), not O(N²).
-    });
-
-    it.skip('treats a fixed-bound loop as constant time', () => {
-        // for (i = 0; i < 100; i++) should be O(1), not O(N).
-    });
+    // These roadmap specifications remain pending until the complexity model
+    // and analyzer can represent their expected results.
 
     it.skip('represents square-root loop bounds', () => {
         // for (i = 1; i * i <= n; i++) should be O(sqrt(N)).

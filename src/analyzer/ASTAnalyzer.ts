@@ -103,13 +103,22 @@ export function getFunctionCallComplexity(node: any): { complexity: Complexity, 
 
 export function getLoopComplexity(node: any): Complexity {
     if (node.type === 'for_statement') {
+        const bound = getForLoopBound(node);
+        if (bound.isConstant) {
+            return new Complexity(0, 0);
+        }
+
         const update = node.childForFieldName('update');
         if (update) {
             if (update.type === 'assignment_expression') {
                 if (update.text.includes('*=') || update.text.includes('/=') || update.text.includes('>>=') || update.text.includes('<<=')) {
-                    return new Complexity(0, 1);
+                    return bound.symbol ? Complexity.logarithmic(bound.symbol) : new Complexity(0, 1);
                 }
             }
+        }
+
+        if (bound.symbol) {
+            return Complexity.variable(bound.symbol);
         }
     } else if (node.type === 'while_statement') {
         const body = node.childForFieldName('body');
@@ -120,6 +129,44 @@ export function getLoopComplexity(node: any): Complexity {
         }
     }
     return new Complexity(1, 0);
+}
+
+function getForLoopBound(node: any): { symbol: string | null, isConstant: boolean } {
+    const initializer = node.childForFieldName('initializer');
+    const condition = node.childForFieldName('condition');
+    if (!initializer || !condition || condition.type !== 'binary_expression') {
+        return { symbol: null, isConstant: false };
+    }
+
+    const declarator = initializer.childForFieldName('declarator');
+    const initialValue = declarator?.childForFieldName('value');
+    const loopVariable = declarator?.childForFieldName('declarator')?.text;
+    const left = condition.childForFieldName('left');
+    const right = condition.childForFieldName('right');
+
+    if (!loopVariable || !left || !right) {
+        return { symbol: null, isConstant: false };
+    }
+
+    const boundary = left.text === loopVariable ? right : (right.text === loopVariable ? left : null);
+    if (!boundary) {
+        return { symbol: null, isConstant: false };
+    }
+
+    if (boundary.type === 'number_literal' && initialValue?.type === 'number_literal') {
+        return { symbol: null, isConstant: true };
+    }
+
+    if (boundary.type === 'identifier') {
+        return { symbol: boundary.text, isConstant: false };
+    }
+
+    // Descending loops often start from the input size and compare against zero.
+    if (boundary.type === 'number_literal' && initialValue?.type === 'identifier') {
+        return { symbol: initialValue.text, isConstant: false };
+    }
+
+    return { symbol: null, isConstant: false };
 }
 
 export function analyzeRecursion(node: any, funcName: string): string | null {

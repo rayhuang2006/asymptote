@@ -10,11 +10,6 @@ export class AlgorithmRegistry {
             name: "Binary Search Logic",
             complexity: "O(log N)",
             regex: /^(?:(?!for_statement|do_statement).)*while_statement.*compound_statement.*(declaration|expression_statement).*if_statement/
-        },
-        {
-            name: "Bubble Sort Logic",
-            complexity: "O(N^2)",
-            regex: /^(?:(?!while_statement|do_statement).)*for_statement.*compound_statement.*for_statement.*compound_statement.*if_statement.*(expression_statement|declaration)/
         }
     ];
 
