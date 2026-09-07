@@ -1,125 +1,90 @@
 import { Complexity } from './Complexity';
-import { AlgorithmRegistry } from './AlgorithmRegistry';
+import { getLoopComplexity, isLoop } from './LoopAnalyzer';
+
+export { getLoopComplexity, isLoop } from './LoopAnalyzer';
 
 export function analyzeBlock(node: any, funcName: string): { complexity: Complexity, reason: string } {
     const recComplexity = analyzeRecursion(node, funcName);
     if (recComplexity) {
-        const compObj = Complexity.fromString(recComplexity);
-        return { complexity: compObj, reason: `Recursive calls detected (${recComplexity})` };
+        const complexity = Complexity.fromString(recComplexity);
+        return { complexity, reason: `Recursive calls detected (${recComplexity})` };
     }
 
-    let maxComplexity = new Complexity(0, 0);
-    let reason = "Constant time operations";
-
-    const signature = getStructureSignature(node);
-    const algo = AlgorithmRegistry.match(signature);
-    let baseComplexity = new Complexity(0, 0);
-    let algoName = "";
-
-    if (algo) {
-        baseComplexity = Complexity.fromString(algo.complexity);
-        algoName = algo.name;
-        maxComplexity = baseComplexity;
-        reason = `Pattern: ${algoName}`;
-    }
-
-    const isBinarySearchPattern = algo && baseComplexity.log > 0;
+    let totalComplexity = new Complexity(0, 0);
+    const reasons: string[] = [];
 
     const children = node.children || [];
     for (const child of children) {
-        let currentComplexity = new Complexity(0, 0);
-        let currentReason = "";
-
-        if (child.type === 'expression_statement') {
-            const callResult = getFunctionCallComplexity(child);
-            currentComplexity = callResult.complexity;
-            currentReason = callResult.reason;
-        }
-        else if (isLoop(child)) {
-            const bodyNode = child.childForFieldName('body');
-            const bodyResult = analyzeBlock(bodyNode, funcName);
-            
-            let loopCost = getLoopComplexity(child);
-            
-            if (isBinarySearchPattern && child.type === 'while_statement') {
-                loopCost = new Complexity(0, 1);
-            }
-
-            currentComplexity = loopCost.multiply(bodyResult.complexity);
-            currentReason = `Loop (${loopCost.toString()}) wrapping: ${bodyResult.complexity.toString()}`;
-        } 
-        else if (child.type === 'compound_statement' || child.type === 'if_statement') {
-             const nested = analyzeBlock(child, funcName);
-             currentComplexity = nested.complexity;
-             currentReason = nested.reason;
-        }
-
-        if (currentComplexity.compare(maxComplexity) > 0) {
-            maxComplexity = currentComplexity;
-            reason = currentReason;
-            
-            if (algo && maxComplexity.compare(baseComplexity) > 0) {
-                 reason = `${algoName} combined with inner logic`;
-            }
-        }
-        
-        if (currentComplexity.isEstimate) {
-            maxComplexity.isEstimate = true;
+        const current = analyzeNode(child, funcName);
+        totalComplexity = totalComplexity.add(current.complexity);
+        if (current.reason && current.complexity.toString() !== 'O( 1 )') {
+            reasons.push(current.reason);
         }
     }
-    
-    return { complexity: maxComplexity, reason };
+
+    return {
+        complexity: totalComplexity,
+        reason: reasons.length > 0 ? reasons.join('\n') : 'Constant time operations'
+    };
 }
 
-export function isLoop(node: any): boolean {
-    return node.type === 'for_statement' || 
-           node.type === 'while_statement' || 
-           node.type === 'do_statement' ||
-           node.type === 'enhanced_for_statement';
+function analyzeNode(node: any, funcName: string): { complexity: Complexity, reason: string } {
+    if (!node) {
+        return { complexity: new Complexity(0, 0), reason: 'Constant time operations' };
+    }
+
+    if (isLoop(node)) {
+        const bodyResult = analyzeNode(node.childForFieldName('body'), funcName);
+        const loopCost = getLoopComplexity(node);
+        return {
+            complexity: loopCost.multiply(bodyResult.complexity),
+            reason: `Loop (${loopCost.toString()}) wrapping: ${bodyResult.complexity.toString()}`
+        };
+    }
+
+    if (node.type === 'expression_statement' || node.type === 'return_statement') {
+        return getFunctionCallComplexity(node);
+    }
+
+    if (node.type === 'declaration' || node.type === 'local_variable_declaration') {
+        const containsCall = ['call_expression', 'call', 'method_invocation']
+            .some(type => node.descendantsOfType(type).length > 0);
+        return containsCall
+            ? getFunctionCallComplexity(node)
+            : { complexity: new Complexity(0, 0), reason: 'Declaration' };
+    }
+
+    if (node.type === 'compound_statement' || node.type === 'block' || node.type === 'if_statement') {
+        return analyzeBlock(node, funcName);
+    }
+
+    return { complexity: new Complexity(0, 0), reason: 'Constant time operations' };
 }
 
 export function getFunctionCallComplexity(node: any): { complexity: Complexity, reason: string } {
     const text = node.text;
-    
+
     if (text.includes('sort(') || text.includes('stable_sort(') || text.includes('sorted(')) {
-        return { complexity: new Complexity(1, 1), reason: `Call: sort (O(N log N))` };
+        return { complexity: new Complexity(1, 1), reason: 'Call: sort (O(N log N))' };
     }
-    if (text.includes('lower_bound(') || text.includes('upper_bound(') || text.includes('binary_search(') || text.includes('binarySearch(')) {
-        return { complexity: new Complexity(0, 1), reason: `Call: binary search (O(log N))` };
+    if (text.includes('lower_bound(') || text.includes('upper_bound(') ||
+        text.includes('binary_search(') || text.includes('binarySearch(')) {
+        return { complexity: new Complexity(0, 1), reason: 'Call: binary search (O(log N))' };
     }
-    if (text.includes('push_back(') || text.includes('pop_back(') || text.includes('max(') || text.includes('min(') || text.includes('append(') || text.includes('.add(')) {
-         return { complexity: new Complexity(0, 0), reason: `Call: O(1) op` };
+    if (text.includes('push_back(') || text.includes('pop_back(') ||
+        text.includes('max(') || text.includes('min(') ||
+        text.includes('append(') || text.includes('.add(')) {
+        return { complexity: new Complexity(0, 0), reason: 'Call: O(1) op' };
     }
 
     if (text.match(/[a-zA-Z_]\w*\s*\(/)) {
-         return { 
-             complexity: new Complexity(0, 0, false, true),
-             reason: `Call: Unknown function '${text.trim().split('(')[0]}'` 
-         };
+        return {
+            complexity: new Complexity(0, 0, false, true),
+            reason: `Call: Unknown function '${text.trim().split('(')[0]}'`
+        };
     }
 
-    return { complexity: new Complexity(0, 0), reason: "Expression" };
-}
-
-export function getLoopComplexity(node: any): Complexity {
-    if (node.type === 'for_statement') {
-        const update = node.childForFieldName('update');
-        if (update) {
-            if (update.type === 'assignment_expression') {
-                if (update.text.includes('*=') || update.text.includes('/=') || update.text.includes('>>=') || update.text.includes('<<=')) {
-                    return new Complexity(0, 1);
-                }
-            }
-        }
-    } else if (node.type === 'while_statement') {
-        const body = node.childForFieldName('body');
-        if (body) {
-            if (body.text.includes('*=') || body.text.includes('/=') || body.text.includes('>>=') || body.text.includes('<<=')) {
-                return new Complexity(0, 1);
-            }
-        }
-    }
-    return new Complexity(1, 0);
+    return { complexity: new Complexity(0, 0), reason: 'Expression' };
 }
 
 export function analyzeRecursion(node: any, funcName: string): string | null {
@@ -150,27 +115,17 @@ export function analyzeRecursion(node: any, funcName: string): string | null {
     };
     traverse(node);
 
-    if (callCount === 0) {return null;}
-    if (callCount >= 2) {return "O(2^N)";}
-    if (hasDivision) {return "O(log N)";}
-    if (hasSubtraction) {return "O(N)";}
-    return "O(N)"; 
-}
-
-export function getStructureSignature(node: any): string {
-    let signature = "";
-    const traverse = (currentNode: any) => {
-        if (currentNode.type === 'identifier' || currentNode.type === 'number_literal') {
-            signature += '#';
-        } else {
-            signature += currentNode.type + '|';
-        }
-        if (currentNode.children) {
-            for (const child of currentNode.children) {
-                traverse(child);
-            }
-        }
-    };
-    traverse(node);
-    return signature;
+    if (callCount === 0) {
+        return null;
+    }
+    if (callCount >= 2) {
+        return 'O(2^N)';
+    }
+    if (hasDivision) {
+        return 'O(log N)';
+    }
+    if (hasSubtraction) {
+        return 'O(N)';
+    }
+    return 'O(N)';
 }
