@@ -437,8 +437,13 @@ body {
     overflow: hidden;
     background-color: var(--asym-raised);
     border: 1px solid var(--asym-border);
-    border-left: 3px solid transparent;
+    /* The left edge always carries the verdict, so an unrun case reads as pending, not blank. */
+    border-left: 3px solid var(--asym-muted);
     border-radius: var(--radius-md);
+}
+
+.test-case.RUN {
+    border-left-color: var(--asym-warn);
 }
 
 .test-case.AC {
@@ -456,7 +461,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
+    padding: var(--sp-1) var(--sp-2);
     font-size: var(--fs-md);
     font-weight: 600;
     cursor: pointer;
@@ -489,9 +494,17 @@ body {
 .case-body {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
-    padding: var(--sp-3);
+    gap: 2px;
+    padding: var(--sp-2);
     border-top: 1px solid var(--asym-border);
+}
+
+.case-body .label {
+    margin-top: var(--sp-1);
+}
+
+.case-body .label:first-child {
+    margin-top: 0;
 }
 
 .collapsed .case-body {
@@ -524,11 +537,12 @@ body {
 
 textarea {
     width: 100%;
-    min-height: 40px;
+    min-height: 0;
     padding: var(--sp-1) var(--sp-2);
     box-sizing: border-box;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
+    line-height: 1.4;
     color: var(--vscode-input-foreground);
     background-color: var(--vscode-input-background);
     border: 1px solid var(--vscode-input-border, var(--asym-border));
@@ -543,14 +557,15 @@ textarea:focus {
 
 /* --- Compile error --------------------------------------------------------- */
 
-.compile-error {
+.runner-error {
     flex: none;
-    background-color: var(--vscode-inputValidation-errorBackground, var(--asym-raised));
-    border: 1px solid var(--vscode-inputValidation-errorBorder, var(--asym-fail));
+    background-color: var(--asym-raised);
+    border: 1px solid var(--asym-fail);
+    border-left-width: 3px;
     border-radius: var(--radius-md);
 }
 
-.compile-error-header {
+.runner-error-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -562,7 +577,7 @@ textarea:focus {
     color: var(--asym-fail);
 }
 
-.compile-error pre {
+.runner-error pre {
     max-height: 220px;
     margin: 0;
     padding: var(--sp-2);
@@ -570,9 +585,10 @@ textarea:focus {
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
     line-height: 1.45;
+    color: var(--asym-fg);
     white-space: pre-wrap;
     word-break: break-word;
-    border-top: 1px solid var(--vscode-inputValidation-errorBorder, var(--asym-border));
+    border-top: 1px solid var(--asym-border);
 }
 
 /* --- Interactive ----------------------------------------------------------- */
@@ -654,4 +670,81 @@ textarea:focus {
 .inline-input::placeholder {
     font-style: italic;
     opacity: 0.5;
+}
+
+/* --- Output diff ----------------------------------------------------------- */
+
+.case-diff {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+}
+
+.diff-summary {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--asym-muted);
+}
+
+.diff-table {
+    max-height: 260px;
+    overflow: auto;
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--fs-md);
+    line-height: 1.5;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--asym-border));
+    border-radius: var(--radius-sm);
+}
+
+.diff-line {
+    display: flex;
+    align-items: baseline;
+    white-space: pre;
+}
+
+.diff-line.removed {
+    background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.16));
+}
+
+.diff-line.added {
+    background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(63, 185, 80, 0.16));
+}
+
+.diff-gutter {
+    flex: none;
+    width: 2.5em;
+    padding-right: var(--sp-1);
+    color: var(--asym-muted);
+    text-align: right;
+    user-select: none;
+}
+
+.diff-sign {
+    flex: none;
+    width: 1.2em;
+    color: var(--asym-muted);
+    text-align: center;
+    user-select: none;
+}
+
+.diff-line.removed .diff-sign {
+    color: var(--asym-fail);
+}
+
+.diff-line.added .diff-sign {
+    color: var(--asym-pass);
+}
+
+.diff-whitespace {
+    background-color: var(--vscode-editorWhitespace-foreground, rgba(128, 128, 128, 0.35));
+    border-radius: 2px;
+}
+
+.diff-text {
+    flex: 1;
+    min-width: 0;
+    padding-right: var(--sp-2);
+    white-space: pre-wrap;
+    word-break: break-word;
 }

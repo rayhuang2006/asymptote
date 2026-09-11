@@ -1,6 +1,8 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { Scraper } from "./utils/Scraper";
 import { CodeRunner, RunnerEvents, TestCase } from "./runner/CodeRunner";
+import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
 import { getWebviewHtml } from "./webview/WebviewHtml";
 import { WorkspaceState, migrateState } from "./webview/WorkspaceState";
 
@@ -93,7 +95,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private async runTests(testCases: TestCase[]): Promise<void> {
     const filePath = await this.saveActiveFile();
     if (!filePath) {
-      this.post({ type: "finished" });
+      this.post({
+        type: "run-error",
+        title: "Nothing to run",
+        output: "Open the solution you want to test in an editor, then run again."
+      });
+      return;
+    }
+
+    const unsupported = this.describeUnsupported(filePath);
+    if (unsupported) {
+      this.post({ type: "run-error", title: "Cannot run this file", output: unsupported });
       return;
     }
 
@@ -107,20 +119,40 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private async runInteractive(): Promise<void> {
     const filePath = await this.saveActiveFile();
     if (!filePath) {
+      this.post({ type: "interactive-error", value: "Open the solution you want to run in an editor, then start again." });
       this.post({ type: "interactive-stopped" });
       return;
     }
+    const unsupported = this.describeUnsupported(filePath);
+    if (unsupported) {
+      this.post({ type: "interactive-error", value: unsupported });
+      this.post({ type: "interactive-stopped" });
+      return;
+    }
+
     await this.runner.startInteractive(filePath);
   }
 
   private async saveActiveFile(): Promise<string | undefined> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showErrorMessage("No active editor found");
       return undefined;
     }
     await editor.document.save();
     return editor.document.fileName;
+  }
+
+  /**
+   * Without this check any active file is handed to g++, so running with a build
+   * artifact or a text file focused produces a linker error about the wrong thing.
+   */
+  private describeUnsupported(filePath: string): string | undefined {
+    if (getLanguage(filePath)) {
+      return undefined;
+    }
+    const name = path.basename(filePath);
+    return `${name} is not a file Asymptote knows how to run.\n\n` +
+      `Open a source file (${SUPPORTED_EXTENSIONS.join(", ")}) and run again.`;
   }
 
   private createRunnerEvents(): RunnerEvents {

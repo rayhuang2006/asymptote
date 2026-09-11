@@ -27,3 +27,6 @@ jobs:
 
       - name: Compile Extension
         run: npm run compile
+
+      - name: Run VS Code integration tests
+        run: xvfb-run -a npm run test:vscode

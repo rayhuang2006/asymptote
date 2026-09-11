@@ -15,7 +15,8 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
         cspSource: webview.cspSource,
         nonce: createNonce(),
         styleUri: asset(webview, extensionUri, "main.css"),
-        scriptUri: asset(webview, extensionUri, "main.js")
+        scriptUri: asset(webview, extensionUri, "main.js"),
+        diffUri: asset(webview, extensionUri, "diff.js")
     };
 
     return template.replace(/\$\{(\w+)\}/g, (match, key: string) =>

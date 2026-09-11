@@ -71,14 +71,14 @@
             </div>
 
             <div id="standard-runner" class="runner-pane">
-                <div id="compile-error" class="compile-error hidden">
-                    <div class="compile-error-header">
-                        <span>Compilation failed</span>
+                <div id="runner-error" class="runner-error hidden">
+                    <div class="runner-error-header">
+                        <span id="runner-error-title">Compilation failed</span>
                         <button id="btn-copy-error" class="btn-icon" title="Copy">
                             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
                         </button>
                     </div>
-                    <pre id="compile-error-body"></pre>
+                    <pre id="runner-error-body"></pre>
                 </div>
 
                 <div id="test-cases-container" class="stack-tight"></div>
@@ -106,6 +106,7 @@
         </section>
     </div>
 
+    <script nonce="${nonce}" src="${diffUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>
