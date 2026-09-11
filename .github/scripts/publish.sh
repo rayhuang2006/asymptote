@@ -3,7 +3,7 @@
 #
 # vsce does not retry a timed out gallery request (microsoft/vscode-vsce#926), and
 # a single slow response is enough to fail a release that is otherwise fine.
-# --skip-duplicates makes a retry safe after a request that timed out on the
+# --skip-duplicate makes a retry safe after a request that timed out on the
 # response but landed on the server.
 set -uo pipefail
 
@@ -14,7 +14,7 @@ VSCE="${VSCE_COMMAND:-npx @vscode/vsce@3.9.2}"
 
 for attempt in $(seq 1 "$ATTEMPTS"); do
     echo "::group::Publish attempt ${attempt} of ${ATTEMPTS}"
-    if $VSCE publish --packagePath "$PACKAGE" --skip-duplicates -p "$VSCE_PAT"; then
+    if $VSCE publish --packagePath "$PACKAGE" --skip-duplicate -p "$VSCE_PAT"; then
         echo "::endgroup::"
         echo "Published on attempt ${attempt}."
         exit 0
