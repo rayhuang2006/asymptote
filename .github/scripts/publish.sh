@@ -18,6 +18,23 @@ echo "::group::Marketplace reachability"
 node "$(dirname "$0")/diagnose-marketplace.js" || echo "diagnostic failed to run"
 echo "::endgroup::"
 
+# The publish request is the only one that carries the token, and it is the only
+# one that hangs: unauthenticated requests to the same host answer in under a
+# second. Ask whether the token itself is accepted, with a short leash so the
+# answer does not cost another three minute socket timeout.
+echo "::group::Token check"
+if timeout 90 $VSCE verify-pat rayhuang2006 -p "$VSCE_PAT"; then
+    echo "The token is accepted."
+else
+    status=$?
+    if [ "$status" -eq 124 ]; then
+        echo "The token check itself timed out, so the hang is in the authenticated path, not in publishing."
+    else
+        echo "The token was rejected (exit ${status})."
+    fi
+fi
+echo "::endgroup::"
+
 # The host publishes AAAA records and GitHub's hosted runners have no IPv6 route.
 # An address that drops packets rather than refusing them looks exactly like a
 # server that never answers, so prefer the family the runner can actually use.
