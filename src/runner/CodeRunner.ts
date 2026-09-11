@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { performance } from "perf_hooks";
 import { ExecutionStrategy, getExecutionStrategy } from "./ExecutionStrategy";
+import { describeMissingCommand, isMissingCommand } from "./toolchain";
 
 export interface TestCase {
     id: string;
@@ -30,6 +31,8 @@ export interface RunOptions {
 export interface RunnerEvents {
     onStatus(value: string): void;
     onCompileError(output: string): void;
+    /** A compiler or interpreter the run needs is not installed. */
+    onToolchainMissing(message: string): void;
     onTestResult(outcome: TestOutcome): void;
     onFinished(): void;
     onInteractiveSystem(value: string): void;
@@ -46,13 +49,18 @@ interface ProcessResult {
     code: number | null;
     isTimeout: boolean;
     time: number;
+    /** Set when the command itself could not be started. */
+    missingCommand?: string;
 }
 
 export class CodeRunner {
     private interactiveProcess?: cp.ChildProcess;
     private activeRun?: { children: Set<cp.ChildProcess>; cancelled: boolean };
 
-    constructor(private readonly events: RunnerEvents) {}
+    constructor(
+        private readonly events: RunnerEvents,
+        private readonly resolveStrategy: typeof getExecutionStrategy = getExecutionStrategy
+    ) {}
 
     public get isRunning(): boolean {
         return this.activeRun !== undefined;
@@ -60,13 +68,17 @@ export class CodeRunner {
 
     public async runTests(filePath: string, testCases: TestCase[], options: RunOptions): Promise<void> {
         const location = this.resolve(filePath);
-        const strategy = getExecutionStrategy(filePath, location.fileDir, location.fileName);
+        const strategy = this.resolveStrategy(filePath, location.fileDir, location.fileName);
 
         if (strategy.compileCommand) {
             this.events.onStatus("Compiling...");
-            const compileError = await this.compile(strategy.compileCommand, location.fileDir);
-            if (compileError !== undefined) {
-                this.events.onCompileError(compileError);
+            const failure = await this.compile(strategy.compileCommand, location.fileDir);
+            if (failure) {
+                if (failure.missingCommand) {
+                    this.events.onToolchainMissing(describeMissingCommand(failure.missingCommand));
+                } else {
+                    this.events.onCompileError(failure.output);
+                }
                 return;
             }
         }
@@ -87,13 +99,15 @@ export class CodeRunner {
 
     public async startInteractive(filePath: string): Promise<void> {
         const location = this.resolve(filePath);
-        const strategy = getExecutionStrategy(filePath, location.fileDir, location.fileName);
+        const strategy = this.resolveStrategy(filePath, location.fileDir, location.fileName);
 
         if (strategy.compileCommand) {
             this.events.onInteractiveSystem("Compiling...");
-            const compileError = await this.compile(strategy.compileCommand, location.fileDir);
-            if (compileError !== undefined) {
-                this.events.onInteractiveError(`Compilation Error:\n${compileError}`);
+            const failure = await this.compile(strategy.compileCommand, location.fileDir);
+            if (failure) {
+                this.events.onInteractiveError(failure.missingCommand
+                    ? describeMissingCommand(failure.missingCommand)
+                    : `Compilation Error:\n${failure.output}`);
                 this.events.onInteractiveStopped();
                 return;
             }
@@ -133,11 +147,20 @@ export class CodeRunner {
         };
     }
 
-    /** Resolves to undefined on success, or to the compiler's stderr on failure. */
-    private compile(command: string, cwd: string): Promise<string | undefined> {
+    /** Resolves to undefined on success, or to what went wrong. */
+    private compile(command: string, cwd: string): Promise<{ output: string; missingCommand?: string } | undefined> {
         return new Promise((resolve) => {
-            cp.exec(command, { cwd }, (error, _stdout, stderr) => {
-                resolve(error ? stderr : undefined);
+            cp.exec(command, { cwd }, (error: any, _stdout, stderr) => {
+                if (!error) {
+                    resolve(undefined);
+                    return;
+                }
+                // A shell reports a missing program as exit 127, and reports it on
+                // stderr rather than through an error code of its own.
+                const missing = isMissingCommand(error) || /not found|is not recognized/i.test(stderr)
+                    ? command.split(/\s+/)[0]
+                    : undefined;
+                resolve({ output: stderr || String(error.message ?? error), missingCommand: missing });
             });
         });
     }
@@ -168,6 +191,11 @@ export class CodeRunner {
                 );
 
                 if (run.cancelled) {
+                    break;
+                }
+
+                if (result.missingCommand) {
+                    this.events.onToolchainMissing(describeMissingCommand(result.missingCommand));
                     break;
                 }
 
@@ -244,6 +272,21 @@ export class CodeRunner {
 
             child.stdout.on("data", (data) => { output += data.toString(); });
             child.stderr.on("data", (data) => { error += data.toString(); });
+
+            // Without this, a command that does not exist emits an unhandled error
+            // event, which takes the extension host down with it.
+            child.on("error", (error: any) => {
+                clearTimeout(timer);
+                children.delete(child);
+                resolve({
+                    output,
+                    error: String(error?.message ?? error),
+                    code: null,
+                    isTimeout: false,
+                    time: performance.now() - startTime,
+                    missingCommand: isMissingCommand(error) ? command : undefined
+                });
+            });
 
             child.on("close", (code) => {
                 if (!isTimeout) {
