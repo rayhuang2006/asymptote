@@ -21,11 +21,11 @@ jobs:
 
       - name: Checkout code
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20.x'
 
@@ -33,6 +33,12 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: npm ci
 
+      - name: Package
+        if: ${{ steps.release.outputs.release_created }}
+        run: npx @vscode/vsce@3.9.2 package --out asymptote.vsix
+
       - name: Publish to VS Code Marketplace
         if: ${{ steps.release.outputs.release_created }}
-        run: npx @vscode/vsce publish -p ${{ secrets.VSCE_PAT }}
+        run: bash .github/scripts/publish.sh asymptote.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
