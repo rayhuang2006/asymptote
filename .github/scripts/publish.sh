@@ -22,6 +22,10 @@ echo "::endgroup::"
 # one that hangs: unauthenticated requests to the same host answer in under a
 # second. Ask whether the token itself is accepted, with a short leash so the
 # answer does not cost another three minute socket timeout.
+echo "::group::Authenticated request"
+node "$(dirname "$0")/diagnose-auth.js" || echo "authenticated diagnostic failed to run"
+echo "::endgroup::"
+
 echo "::group::Token check"
 if timeout 90 $VSCE verify-pat rayhuang2006 -p "$VSCE_PAT"; then
     echo "The token is accepted."
