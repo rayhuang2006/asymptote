@@ -13,7 +13,7 @@
 
 **Asymptote** is a VS Code extension designed to help competitive programmers visualize the theoretical speed of their code *while typing*. It combines a heuristic complexity analyzer with a robust local test runner. By providing a worst-case estimation instantly, it helps you catch accidental `O(N²)` or `O(2^N)` logic before you even compile.
 
-> **Supported Language:** Asymptote currently supports **C++** exclusively.
+> **Supported Languages:** C++, Python and Java.
 
 ---
 
@@ -29,7 +29,7 @@ code --install-extension rayhuang2006.asymptote-helper
 1.  Install **Asymptote** from the VS Code Marketplace.
 2.  Open any `.cpp` file.
 3.  Start coding\! The complexity CodeLens will automatically appear above your functions.
-4.  Use the sidebar to parse Codeforces problems and run local tests.
+4.  Use the sidebar to import a problem and run local tests.
 
 -----
 
@@ -47,9 +47,9 @@ See the Big O notation directly above your C++ functions. Asymptote parses your 
 
 ### 2\. Local Judge (Runner)
 
-A dedicated sidebar for managing test cases without leaving your editor—acting as a lightweight Codeforces local judge built directly into VS Code.
+A dedicated sidebar for managing test cases without leaving your editor—acting as a lightweight local judge built directly into VS Code.
 
-  * **Problem Parsing:** One-click import from **Codeforces**. Fetches title, limits, and sample cases.
+  * **Problem Parsing:** One-click import from **Codeforces**, **AtCoder** and **NCU Online Judge**. Fetches title, limits, statement, and sample cases.
   * **Local Execution:** Compiles and runs your code against inputs.
   * **Verdict Display:** Clear **AC**, **WA**, **TLE**, or **RE** status with execution time.
   * **Strict Comparison Mode:** Option to enforce exact character-for-character matching for outputs, including trailing whitespaces.
@@ -81,7 +81,7 @@ Asymptote's complexity analyzer uses static AST parsing and heuristics, providin
 To use the **Local Judge** feature, you need:
 
   * **C++ Compiler (GCC/G++)**: Must be installed and accessible in your system's PATH.
-  * **Browser**: **Google Chrome, Microsoft Edge, or Brave**. Asymptote requires a local browser executable to silently scrape and parse problem limits and test cases from Codeforces.
+  * **Browser**: **Google Chrome, Microsoft Edge, or Brave**, needed only for Codeforces, which answers a plain request with a browser check. AtCoder and NCU Online Judge are read over HTTP and need no browser.
 
 > *Note: The Complexity Analysis (CodeLens) works entirely offline and out-of-the-box without any external dependencies.*
 

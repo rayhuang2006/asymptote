@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { SidebarProvider } from './SidebarProvider';
+import { ProblemFetcher } from './scraper/ProblemFetcher';
 import { analyzeBlock } from './analyzer/ASTAnalyzer';
 
 const Parser = require('web-tree-sitter');
@@ -30,7 +31,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
         const providers = [cppProvider, pythonProvider, javaProvider];
 
-        const sidebarProvider = new SidebarProvider(context.extensionUri, context);
+        const fetcher = new ProblemFetcher(context.globalStorageUri);
+        context.subscriptions.push({ dispose: () => { void fetcher.dispose(); } });
+
+        const sidebarProvider = new SidebarProvider(context.extensionUri, context, fetcher);
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider("asymptote-sidebar", sidebarProvider)
         );

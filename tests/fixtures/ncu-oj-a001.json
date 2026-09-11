@@ -1,0 +1,60 @@
+{
+  "error": null,
+  "data": {
+    "id": 144,
+    "tags": [
+      "easy"
+    ],
+    "created_by": {
+      "id": 1,
+      "username": "hippotumux",
+      "real_name": null
+    },
+    "template": {},
+    "_id": "A001",
+    "title": "兩數運算",
+    "description": "<p>給定一個集合G，並且我們也給定一個二元運算．（像是1+2中的「+」就是一個二元運算，或是像2×3中的「×」也是一個二元運算）。我們說集合G配備．這個二元運算是一個群時，必須要滿足以下三個限制：</p><p>1. 任意從集合G中取出元素做二元運算．必須滿足結合律，也就是對於任意的a,b,c屬於集合G，(a．b)．c = a．(b．c)</p><p>2. 集合G中存在有一個二元運算<span style=\"color: rgb(51, 51, 51);\">．</span>的單位元素e，也就是對於任意的a屬於集合G，a<span style=\"color: rgb(51, 51, 51);\">．e = e．a = a</span></p><p>3. 集合G中任一個元素都一定會有反元素，也就是對於任意的a屬於集合G，都一定存在有一個元素b屬於G，使得a<span style=\"color: rgb(51, 51, 51);\">．b = b．a = e</span></p><p>若是a．b = b．a，那我們進一步說這個群G是阿貝爾群。注意！！！ 任意元素a,b屬於G中，a．b也一定要落在G裡。</p><p>從上述的內容中我們很好得知：集合S={0,1,2,3,4,5,6}配備一個特殊的二元運算◎是一個阿貝爾群。運算符號被定義如下：</p><p>對於任意的a,b屬於S，a◎b = r ，r ≡ a×b (mod 7) 也就是說，<span style=\"color: rgb(51, 51, 51);\">a◎b的值就是取a與b相乘後的值除以7的餘數值。</span></p><p><span style=\"color: rgb(51, 51, 51);\">芋頭大將軍很自豪地學會了群的定義，他使用上述的群S中的元素做一些運算 (像是5◎6=2，1◎3=3) ，很可惜地他卡在了下面的題目上，請你幫他完成題目：</span></p><ul><li>給定a,b兩個整數，a<span style=\"color: rgb(51, 51, 51);\">◎b = ?</span></li></ul>",
+    "input_description": "<p>輸入兩個整數 a b 以空白隔開</p>",
+    "output_description": "<p>輸出 a<span style=\"color: rgb(51, 51, 51);\">◎</span>b 結果</p>",
+    "samples": [
+      {
+        "input": "1 3",
+        "output": "3"
+      },
+      {
+        "input": "2 5",
+        "output": "3"
+      }
+    ],
+    "hint": "",
+    "languages": [
+      "C++",
+      "Python3"
+    ],
+    "create_time": "2024-03-06T03:08:49.825840Z",
+    "last_update_time": null,
+    "time_limit": 1000,
+    "memory_limit": 256,
+    "io_mode": {
+      "input": "input.txt",
+      "output": "output.txt",
+      "io_mode": "Standard IO"
+    },
+    "spj": false,
+    "spj_language": null,
+    "rule_type": "ACM",
+    "difficulty": "Low",
+    "source": "",
+    "total_score": 0,
+    "submission_number": 155,
+    "accepted_number": 78,
+    "statistic_info": {
+      "0": 78,
+      "4": 25,
+      "-1": 22,
+      "-2": 30
+    },
+    "share_submission": false,
+    "contest": null
+  }
+}
