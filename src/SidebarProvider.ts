@@ -1,6 +1,8 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { Scraper } from "./utils/Scraper";
 import { CodeRunner, RunnerEvents, TestCase } from "./runner/CodeRunner";
+import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
 import { getWebviewHtml } from "./webview/WebviewHtml";
 import { WorkspaceState, migrateState } from "./webview/WorkspaceState";
 
@@ -101,6 +103,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const unsupported = this.describeUnsupported(filePath);
+    if (unsupported) {
+      this.post({ type: "run-error", title: "Cannot run this file", output: unsupported });
+      return;
+    }
+
     const config = vscode.workspace.getConfiguration("asymptote");
     await this.runner.runTests(filePath, testCases, {
       strict: config.get<boolean>("strictComparison", false),
@@ -115,6 +123,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this.post({ type: "interactive-stopped" });
       return;
     }
+    const unsupported = this.describeUnsupported(filePath);
+    if (unsupported) {
+      this.post({ type: "interactive-error", value: unsupported });
+      this.post({ type: "interactive-stopped" });
+      return;
+    }
+
     await this.runner.startInteractive(filePath);
   }
 
@@ -125,6 +140,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
     await editor.document.save();
     return editor.document.fileName;
+  }
+
+  /**
+   * Without this check any active file is handed to g++, so running with a build
+   * artifact or a text file focused produces a linker error about the wrong thing.
+   */
+  private describeUnsupported(filePath: string): string | undefined {
+    if (getLanguage(filePath)) {
+      return undefined;
+    }
+    const name = path.basename(filePath);
+    return `${name} is not a file Asymptote knows how to run.\n\n` +
+      `Open a source file (${SUPPORTED_EXTENSIONS.join(", ")}) and run again.`;
   }
 
   private createRunnerEvents(): RunnerEvents {

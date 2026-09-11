@@ -115,22 +115,32 @@
     function renderProblem() {
         const problem = state.problem;
         els['problem-content'].innerHTML = problem ? buildProblemMarkup(problem) : '';
-        els['problem-meta'].textContent = problem && problem.timeLimit
-            ? problem.timeLimit + ' / ' + problem.memoryLimit
-            : '';
+        els['problem-meta'].textContent = formatLimits(problem);
 
         if (problem && window.MathJax && window.MathJax.typesetPromise) {
             window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
         }
     }
 
+    /** Scrapers report "Unknown" when a site does not publish limits; saying so twice is noise. */
+    function formatLimits(problem) {
+        if (!problem) {
+            return '';
+        }
+        const limits = [problem.timeLimit, problem.memoryLimit]
+            .filter((limit) => limit && limit.toLowerCase() !== 'unknown');
+        return limits.join(' / ');
+    }
+
     function buildProblemMarkup(problem) {
-        const header = problem.title
-            ? '<h2 class="problem-title">' + escapeHtml(problem.title) + '</h2>' +
-              '<p class="problem-limits">time limit: ' + escapeHtml(problem.timeLimit) +
-              ' | memory limit: ' + escapeHtml(problem.memoryLimit) + '</p>'
-            : '';
-        return header + problem.html;
+        if (!problem.title) {
+            return problem.html;
+        }
+
+        const limits = formatLimits(problem);
+        return '<h2 class="problem-title">' + escapeHtml(problem.title) + '</h2>' +
+            (limits ? '<p class="problem-limits">' + escapeHtml(limits) + '</p>' : '') +
+            problem.html;
     }
 
     function escapeHtml(value) {
@@ -304,7 +314,8 @@
         const showDiff = Boolean(result) && result.status === 'WA' && testCase.expected !== '' && hasDiffModule();
 
         toggle(host, !showDiff);
-        toggle(outputSection, showDiff);
+        // Before a run there is nothing to put in the output box, so it only takes up room.
+        toggle(outputSection, showDiff || !result);
 
         if (!showDiff) {
             host.textContent = '';

@@ -456,7 +456,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
+    padding: var(--sp-1) var(--sp-2);
     font-size: var(--fs-md);
     font-weight: 600;
     cursor: pointer;
@@ -489,9 +489,17 @@ body {
 .case-body {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
-    padding: var(--sp-3);
+    gap: 2px;
+    padding: var(--sp-2);
     border-top: 1px solid var(--asym-border);
+}
+
+.case-body .label {
+    margin-top: var(--sp-1);
+}
+
+.case-body .label:first-child {
+    margin-top: 0;
 }
 
 .collapsed .case-body {
@@ -524,11 +532,12 @@ body {
 
 textarea {
     width: 100%;
-    min-height: 40px;
+    min-height: 0;
     padding: var(--sp-1) var(--sp-2);
     box-sizing: border-box;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
+    line-height: 1.4;
     color: var(--vscode-input-foreground);
     background-color: var(--vscode-input-background);
     border: 1px solid var(--vscode-input-border, var(--asym-border));
@@ -545,8 +554,9 @@ textarea:focus {
 
 .runner-error {
     flex: none;
-    background-color: var(--vscode-inputValidation-errorBackground, var(--asym-raised));
-    border: 1px solid var(--vscode-inputValidation-errorBorder, var(--asym-fail));
+    background-color: var(--asym-raised);
+    border: 1px solid var(--asym-fail);
+    border-left-width: 3px;
     border-radius: var(--radius-md);
 }
 
@@ -570,9 +580,10 @@ textarea:focus {
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
     line-height: 1.45;
+    color: var(--asym-fg);
     white-space: pre-wrap;
     word-break: break-word;
-    border-top: 1px solid var(--vscode-inputValidation-errorBorder, var(--asym-border));
+    border-top: 1px solid var(--asym-border);
 }
 
 /* --- Interactive ----------------------------------------------------------- */
