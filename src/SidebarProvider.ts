@@ -3,11 +3,11 @@ import * as vscode from "vscode";
 import { ProblemFetcher } from "./scraper/ProblemFetcher";
 import { CodeRunner, RunnerEvents, TestCase } from "./runner/CodeRunner";
 import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
+import { resolveTimeLimit } from "./runner/timeLimit";
 import { getWebviewHtml } from "./webview/WebviewHtml";
 import { WorkspaceState, migrateState } from "./webview/WorkspaceState";
 
 const STATE_KEY = "asymptote-state";
-const DEFAULT_TIMEOUT_MS = 2000;
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
@@ -41,7 +41,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         this.post({ type: "init", state: this.loadState() });
         break;
       case "run":
-        await this.runTests(message.testCases);
+        await this.runTests(message.testCases, message.timeLimit);
         break;
       case "run-interactive":
         await this.runInteractive();
@@ -92,7 +92,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async runTests(testCases: TestCase[]): Promise<void> {
+  private async runTests(testCases: TestCase[], timeLimit?: string): Promise<void> {
     const filePath = await this.saveActiveFile();
     if (!filePath) {
       this.post({
@@ -112,7 +112,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const config = vscode.workspace.getConfiguration("asymptote");
     await this.runner.runTests(filePath, testCases, {
       strict: config.get<boolean>("strictComparison", false),
-      timeoutMs: DEFAULT_TIMEOUT_MS
+      // A three second problem was still judged against two seconds locally.
+      timeoutMs: resolveTimeLimit(timeLimit)
     });
   }
 

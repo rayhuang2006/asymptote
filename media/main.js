@@ -473,6 +473,7 @@
         setRunning(true, 'Compiling...');
         vscode.postMessage({
             command: 'run',
+            timeLimit: state.problem ? state.problem.timeLimit : '',
             testCases: selected.map((testCase) => ({
                 id: testCase.id,
                 input: testCase.input,

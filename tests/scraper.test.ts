@@ -108,7 +108,7 @@ describe('NCU Online Judge adapter', () => {
 
     it('reads the limits the rendered page never showed', () => {
         assert.strictEqual(problem.title, '兩數運算');
-        assert.strictEqual(problem.timeLimit, '1 seconds');
+        assert.strictEqual(problem.timeLimit, '1 second');
         assert.strictEqual(problem.memoryLimit, '256 MB');
     });
 
