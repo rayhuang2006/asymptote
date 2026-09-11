@@ -277,6 +277,11 @@
      * A wrong answer is shown as a unified diff instead of two boxes to eyeball, because
      * the difference is often a single line or an invisible trailing space.
      */
+    /** The diff module is a separate script; without it the panel falls back to the output box. */
+    function hasDiffModule() {
+        return Boolean(global.AsymptoteDiff && typeof global.AsymptoteDiff.compare === 'function');
+    }
+
     function placeholderFor(result) {
         if (!result) {
             return 'waiting...';
@@ -296,7 +301,7 @@
     function renderDiff(node, testCase, result) {
         const host = node.querySelector('.case-diff');
         const outputSection = node.querySelector('.case-output');
-        const showDiff = Boolean(result) && result.status === 'WA' && testCase.expected !== '';
+        const showDiff = Boolean(result) && result.status === 'WA' && testCase.expected !== '' && hasDiffModule();
 
         toggle(host, !showDiff);
         toggle(outputSection, showDiff);
@@ -751,5 +756,5 @@
     cacheElements();
     wire();
     render();
-    vscode.postMessage({ command: 'ready' });
+    vscode.postMessage({ command: 'ready', diffLoaded: hasDiffModule() });
 }(typeof globalThis === 'undefined' ? this : globalThis));
