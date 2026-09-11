@@ -4,6 +4,18 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.6.0](https://github.com/rayhuang2006/asymptote/compare/v0.5.1...v0.6.0) (2026-09-11)
+
+
+### Features
+
+* **scraper:** read AtCoder and NCU OJ directly, and keep one browser warm ([#44](https://github.com/rayhuang2006/asymptote/issues/44)) ([f0bdf25](https://github.com/rayhuang2006/asymptote/commit/f0bdf25ee97540a01706a5326b7175cca75c47e8))
+
+
+### Performance Improvements
+
+* **build:** bundle the extension with esbuild ([#42](https://github.com/rayhuang2006/asymptote/issues/42)) ([1248c8b](https://github.com/rayhuang2006/asymptote/commit/1248c8b0c4c624a6086ff9fb14f7dcf0c2f9f954))
+
 ## [0.5.1](https://github.com/rayhuang2006/asymptote/compare/v0.5.0...v0.5.1) (2026-09-11)
 
 
