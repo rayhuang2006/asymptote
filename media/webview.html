@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; img-src ${cspSource} https: data:;">
+    <title>Asymptote</title>
+    <script nonce="${nonce}">
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="${styleUri}" rel="stylesheet">
+</head>
+<body>
+    <div id="home-view" class="view home">
+        <div class="home-logo">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M12 20L24 32L12 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+                <path d="M30 44H38C44 44 48 36 52 20" stroke="var(--asym-accent)" stroke-width="4" stroke-linecap="round"/>
+                <path d="M52 20L46 26M52 20L56 26" stroke="var(--asym-accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h1 class="home-title">ASYMPTOTE</h1>
+
+        <div id="main-menu" class="stack">
+            <button id="btn-import-url" class="btn btn-primary">Import from URL</button>
+            <button id="btn-manual-create" class="btn btn-outline">Manual Create</button>
+            <button id="btn-resume" class="btn btn-ghost hidden">Resume last session</button>
+        </div>
+
+        <div id="parse-ui" class="panel stack hidden">
+            <label class="field">
+                <span class="field-label">Problem URL</span>
+                <input type="text" id="problem-url" class="text-input" placeholder="https://codeforces.com/..." />
+            </label>
+            <button id="fetchBtn" class="btn btn-primary">Fetch</button>
+            <button id="btn-cancel-parse" class="btn btn-ghost">Cancel</button>
+            <p id="parse-error" class="inline-error hidden"></p>
+        </div>
+    </div>
+
+    <div id="workspace-view" class="view workspace hidden">
+        <header class="workspace-header">
+            <div class="nav-bar">
+                <button id="btn-gohome" class="back-btn">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 12L4 8l6-4v8z"/></svg>
+                    Home
+                </button>
+                <span id="problem-meta" class="nav-meta"></span>
+            </div>
+            <nav class="tabs" role="tablist">
+                <button id="tab-btn-problem" class="tab" role="tab">Problem</button>
+                <button id="tab-btn-runner" class="tab active" role="tab">Runner</button>
+            </nav>
+        </header>
+
+        <section id="content-problem" class="content-area hidden">
+            <div id="problem-content" class="prose"></div>
+        </section>
+
+        <section id="content-runner" class="content-area runner">
+            <div class="mode-switch" role="tablist">
+                <button id="mode-standard" class="mode-option active" role="tab">Test Cases</button>
+                <button id="mode-interactive" class="mode-option" role="tab">Interactive</button>
+            </div>
+
+            <div id="standard-runner" class="runner-pane">
+                <div id="compile-error" class="compile-error hidden">
+                    <div class="compile-error-header">
+                        <span>Compilation failed</span>
+                        <button id="btn-copy-error" class="btn-icon" title="Copy">
+                            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
+                        </button>
+                    </div>
+                    <pre id="compile-error-body"></pre>
+                </div>
+
+                <div id="test-cases-container" class="stack-tight"></div>
+                <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
+
+                <div class="runner-actions">
+                    <button id="btn-add-case" class="btn btn-dashed">+ Add Case</button>
+                    <button id="runBtn" class="btn btn-primary">Run All</button>
+                </div>
+            </div>
+
+            <div id="interactive-runner" class="runner-pane interactive hidden">
+                <div class="column-header">
+                    <span class="col">Judge (input)</span>
+                    <span class="col">Code (output)</span>
+                </div>
+                <div id="chat-history" class="chat-history">
+                    <div class="msg-system">Click Start to launch an interactive session.</div>
+                </div>
+                <div class="runner-actions">
+                    <button id="interactiveStartBtn" class="btn btn-primary">Start Interactive Session</button>
+                    <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop Process</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>

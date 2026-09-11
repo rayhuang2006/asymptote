@@ -1,386 +1,606 @@
-            const vscode = acquireVsCodeApi();
-            
-            const homeView = document.getElementById('home-view');
-            const workspaceView = document.getElementById('workspace-view');
-            const mainMenu = document.getElementById('main-menu');
-            const parseUI = document.getElementById('parse-ui');
-            const container = document.getElementById('test-cases-container');
-            const runBtn = document.getElementById('runBtn');
-            const fetchBtn = document.getElementById('fetchBtn');
-            const problemContent = document.getElementById('problem-content');
-            let testCaseCount = 0;
-            let debounceTimer;
-            let activeInputRow = null;
+(function () {
+    'use strict';
 
-            function saveState() {
-                const state = {
-                    view: 'workspace',
-                    tab: document.getElementById('tab-btn-runner').classList.contains('active') ? 'runner' : 'problem',
-                    problemHtml: problemContent.innerHTML,
-                    testCases: collectCases(),
-                    interactive: document.getElementById('interactive-mode').checked
-                };
-                vscode.postMessage({ command: 'save-state', state: state });
+    const vscode = acquireVsCodeApi();
+    const STATE_VERSION = 2;
+    const SAVE_DEBOUNCE_MS = 400;
+
+    /**
+     * The single source of truth for the panel. Everything on screen is rendered
+     * from here, and nothing is ever read back out of the DOM.
+     */
+    const state = {
+        view: 'home',
+        hasSession: false,
+        tab: 'runner',
+        mode: 'standard',
+        problem: null,
+        cases: []
+    };
+
+    /** Run outcomes live for the session only; they are never persisted. */
+    const results = new Map();
+
+    let saveTimer;
+    let activeInputRow = null;
+
+    const els = {};
+
+    function byId(id) {
+        return document.getElementById(id);
+    }
+
+    function cacheElements() {
+        [
+            'home-view', 'workspace-view', 'main-menu', 'parse-ui', 'parse-error',
+            'problem-url', 'fetchBtn', 'btn-resume', 'problem-content', 'problem-meta',
+            'test-cases-container', 'cases-empty', 'runBtn', 'compile-error',
+            'compile-error-body', 'standard-runner', 'interactive-runner',
+            'mode-standard', 'mode-interactive', 'chat-history',
+            'interactiveStartBtn', 'interactiveStopBtn',
+            'tab-btn-problem', 'tab-btn-runner', 'content-problem', 'content-runner'
+        ].forEach((id) => { els[id] = byId(id); });
+    }
+
+    /* --- state ------------------------------------------------------------- */
+
+    function createCase(input, expected) {
+        return {
+            id: 'case-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11),
+            input: input || '',
+            expected: expected || ''
+        };
+    }
+
+    function serializeState() {
+        if (!state.hasSession) {
+            return null;
+        }
+        return {
+            version: STATE_VERSION,
+            view: state.view,
+            tab: state.tab,
+            mode: state.mode,
+            problem: state.problem,
+            testCases: state.cases.map((testCase) => ({
+                id: testCase.id,
+                input: testCase.input,
+                expected: testCase.expected
+            }))
+        };
+    }
+
+    function persist() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            vscode.postMessage({ command: 'save-state', state: serializeState() });
+        }, SAVE_DEBOUNCE_MS);
+    }
+
+    function applyStoredState(stored) {
+        state.view = stored.view === 'home' ? 'home' : 'workspace';
+        state.hasSession = true;
+        state.tab = stored.tab || 'runner';
+        state.mode = stored.mode || 'standard';
+        state.problem = stored.problem || null;
+        state.cases = (stored.testCases || []).map((testCase) => ({
+            id: testCase.id,
+            input: testCase.input,
+            expected: testCase.expected
+        }));
+        results.clear();
+    }
+
+    /* --- rendering --------------------------------------------------------- */
+
+    function render() {
+        toggle(els['home-view'], state.view !== 'home');
+        toggle(els['workspace-view'], state.view !== 'workspace');
+        toggle(els['btn-resume'], !(state.view === 'home' && state.hasSession));
+
+        if (state.view === 'workspace') {
+            renderProblem();
+            renderTabs();
+            renderMode();
+            renderCases();
+        }
+    }
+
+    function toggle(element, hidden) {
+        if (element) {
+            element.classList.toggle('hidden', hidden);
+        }
+    }
+
+    function renderProblem() {
+        const problem = state.problem;
+        els['problem-content'].innerHTML = problem ? buildProblemMarkup(problem) : '';
+        els['problem-meta'].textContent = problem && problem.timeLimit
+            ? problem.timeLimit + ' / ' + problem.memoryLimit
+            : '';
+
+        if (problem && window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
+        }
+    }
+
+    function buildProblemMarkup(problem) {
+        const header = problem.title
+            ? '<h2 class="problem-title">' + escapeHtml(problem.title) + '</h2>' +
+              '<p class="problem-limits">time limit: ' + escapeHtml(problem.timeLimit) +
+              ' | memory limit: ' + escapeHtml(problem.memoryLimit) + '</p>'
+            : '';
+        return header + problem.html;
+    }
+
+    function escapeHtml(value) {
+        return String(value === undefined || value === null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function renderTabs() {
+        els['tab-btn-problem'].classList.toggle('active', state.tab === 'problem');
+        els['tab-btn-runner'].classList.toggle('active', state.tab === 'runner');
+        toggle(els['content-problem'], state.tab !== 'problem');
+        toggle(els['content-runner'], state.tab !== 'runner');
+    }
+
+    function renderMode() {
+        const interactive = state.mode === 'interactive';
+        els['mode-standard'].classList.toggle('active', !interactive);
+        els['mode-interactive'].classList.toggle('active', interactive);
+        toggle(els['standard-runner'], interactive);
+        toggle(els['interactive-runner'], !interactive);
+    }
+
+    function renderCases() {
+        const container = els['test-cases-container'];
+
+        state.cases.forEach((testCase, index) => {
+            let node = byId(testCase.id);
+            if (!node) {
+                node = buildCaseNode(testCase);
+                container.appendChild(node);
             }
-
-            function triggerSave() {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(saveState, 500);
+            if (container.children[index] !== node) {
+                container.insertBefore(node, container.children[index] || null);
             }
+            updateCaseNode(node, testCase, index);
+        });
 
-            function showParseUI() { mainMenu.classList.add('hidden'); parseUI.classList.remove('hidden'); }
-            function hideParseUI() { parseUI.classList.add('hidden'); mainMenu.classList.remove('hidden'); }
-            function manualStart() { 
-                vscode.postMessage({ command: 'manual-create' }); 
+        Array.from(container.children).forEach((node) => {
+            if (!state.cases.some((testCase) => testCase.id === node.id)) {
+                node.remove();
             }
-            function startParsing() {
-                const url = document.getElementById('problem-url').value;
-                if(!url) return;
-                fetchBtn.disabled = true;
-                fetchBtn.innerText = 'Fetching...';
-                vscode.postMessage({ command: 'parse-url', url: url });
-            }
-            function goHome() {
-                container.innerHTML = ''; testCaseCount = 0;
-                workspaceView.classList.add('hidden'); homeView.classList.remove('hidden'); hideParseUI();
-                fetchBtn.disabled = false; fetchBtn.innerText = 'Fetch';
-                vscode.postMessage({ command: 'save-state', state: null }); 
-            }
+        });
 
-            function switchTab(tabName) {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.getElementById('tab-btn-' + tabName).classList.add('active');
-                document.getElementById('content-problem').classList.add('hidden');
-                document.getElementById('content-runner').classList.add('hidden');
-                document.getElementById('content-' + tabName).classList.remove('hidden');
+        toggle(els['cases-empty'], state.cases.length > 0);
+    }
 
-                if (tabName === 'runner') {
-                    setTimeout(() => {
-                        document.querySelectorAll('textarea').forEach(autoResize);
-                    }, 50);
-                }
-                triggerSave();
-            }
+    function buildCaseNode(testCase) {
+        const node = document.createElement('div');
+        node.className = 'test-case';
+        node.id = testCase.id;
+        node.innerHTML =
+            '<div class="case-header">' +
+                '<div class="case-summary">' +
+                    '<span class="case-number"></span>' +
+                    '<span class="status-tag"></span>' +
+                    '<span class="time-tag"></span>' +
+                '</div>' +
+                '<div class="case-actions">' +
+                    '<button class="btn-icon btn-run" title="Run this case"><svg viewBox="0 0 16 16"><path d="M4 2v12l10-6L4 2z"/></svg></button>' +
+                    '<button class="btn-icon btn-clone" title="Clone"><svg viewBox="0 0 16 16"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg></button>' +
+                    '<button class="btn-icon btn-remove" title="Remove"><svg viewBox="0 0 16 16"><path d="M13.9 2.1a.5.5 0 0 1 0 .7l-11 11a.5.5 0 0 1-.7-.7l11-11a.5.5 0 0 1 .7 0Z"/><path d="M2.1 2.1a.5.5 0 0 0 0 .7l11 11a.5.5 0 0 0 .7-.7l-11-11a.5.5 0 0 0-.7 0Z"/></svg></button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="case-body">' +
+                '<span class="label">Input</span><textarea class="input-box" rows="2"></textarea>' +
+                '<span class="label">Expected</span><textarea class="expected-box" rows="2"></textarea>' +
+                '<span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>' +
+            '</div>';
 
-            function autoResize(el) {
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
-            }
+        const inputBox = node.querySelector('.input-box');
+        const expectedBox = node.querySelector('.expected-box');
+        inputBox.value = testCase.input;
+        expectedBox.value = testCase.expected;
 
-            function addTestCase(inputVal = '', expectedVal = '') {
-                testCaseCount++;
-                const id = 'case-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                const div = document.createElement('div');
-                div.className = 'test-case'; div.id = id;
-                div.innerHTML = `
-                    <div class="case-header">
-                        <div><span class="case-number">#</span><span class="status-tag"></span><span class="time-tag"></span></div>
-                        <div class="case-actions">
-                            <button class="btn-icon btn-run" title="Run This"><svg viewBox="0 0 16 16"><path d="M4 2v12l10-6L4 2z"/></svg></button>
-                            <button class="btn-icon btn-clone" title="Clone"><svg viewBox="0 0 16 16"><path d="M4 4h8v8H4z M12 2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z m2 2v8h-1V4h1z m-2 0H4v8h8V4z"/></svg></button>
-                            <button class="btn-icon btn-remove" title="Remove"><svg viewBox="0 0 16 16"><path d="M13.854 2.146a.5.5 0 0 1 0 .708l-11 11a.5.5 0 0 1-.708-.708l11-11a.5.5 0 0 1 .708 0Z"/><path d="M2.146 2.146a.5.5 0 0 0 0 .708l11 11a.5.5 0 0 0 .708-.708l-11-11a.5.5 0 0 0-.708 0Z"/></svg></button>
-                        </div>
-                    </div>
-                    <div class="case-body">
-                        <span class="label">Input</span><textarea class="input-box" rows="2">${inputVal}</textarea>
-                        <span class="label">Expected</span><textarea class="expected-box" rows="2">${expectedVal}</textarea>
-                        <span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>
-                    </div>`;
-                container.appendChild(div); 
-                
-                div.querySelector('.case-header').addEventListener('click', function() { toggleCase(this); });
-                div.querySelector('.btn-run').addEventListener('click', function(e) { runSingleCase(id, e); });
-                div.querySelector('.btn-clone').addEventListener('click', function(e) { cloneCase(id, e); });
-                div.querySelector('.btn-remove').addEventListener('click', function(e) { removeTestCase(this, e); });
-                
-                div.querySelector('.input-box').addEventListener('input', function() { autoResize(this); triggerSave(); });
-                div.querySelector('.expected-box').addEventListener('input', function() { autoResize(this); triggerSave(); });
+        node.querySelector('.case-header').addEventListener('click', () => toggleCollapsed(testCase.id));
+        node.querySelector('.btn-run').addEventListener('click', (event) => {
+            event.stopPropagation();
+            runCases([testCase.id]);
+        });
+        node.querySelector('.btn-clone').addEventListener('click', (event) => {
+            event.stopPropagation();
+            cloneCase(testCase.id);
+        });
+        node.querySelector('.btn-remove').addEventListener('click', (event) => {
+            event.stopPropagation();
+            removeCase(testCase.id);
+        });
 
-                updateIndices();
-                triggerSave();
-                
-                setTimeout(() => {
-                    div.querySelectorAll('textarea').forEach(autoResize);
-                }, 0);
-            }
+        inputBox.addEventListener('input', () => {
+            testCase.input = inputBox.value;
+            autoResize(inputBox);
+            persist();
+        });
+        expectedBox.addEventListener('input', () => {
+            testCase.expected = expectedBox.value;
+            autoResize(expectedBox);
+            persist();
+        });
 
-            function toggleCase(h) { h.parentElement.classList.toggle('collapsed'); }
-            function removeTestCase(b, e) { e.stopPropagation(); b.closest('.test-case').remove(); updateIndices(); triggerSave(); }
-            function cloneCase(id, e) { e.stopPropagation(); const o = document.getElementById(id); if(o) addTestCase(o.querySelector('.input-box').value, o.querySelector('.expected-box').value); }
-            function updateIndices() { let i = 0; container.querySelectorAll('.test-case').forEach(c => { i++; c.querySelector('.case-number').innerText = '#' + i; }); }
-            function runSingleCase(id, e) { e.stopPropagation(); const c = document.getElementById(id); if(!c) return; resetCaseUI(c); vscode.postMessage({ command: 'run', testCases: [{ input: c.querySelector('.input-box').value, expected: c.querySelector('.expected-box').value, id }] }); }
-            function runTests() { 
-                const c = collectCases(); 
-                if(c.length) sendRunCommand(c); 
-            }
-            function resetCaseUI(c) { c.querySelector('.output-box').value = ''; c.querySelector('.status-tag').innerText = ''; c.querySelector('.time-tag').innerText = ''; c.classList.remove('AC', 'WA', 'collapsed'); }
-            function sendRunCommand(c) { runBtn.disabled = true; runBtn.innerText = 'Compiling...'; vscode.postMessage({ command: 'run', testCases: c }); }
-            
-            function collectCases() {
-                const cases = [];
-                container.querySelectorAll('.test-case').forEach(c => {
-                    cases.push({
-                        input: c.querySelector('.input-box').value,
-                        expected: c.querySelector('.expected-box').value,
-                        id: c.id
-                    });
-                });
-                return cases;
-            }
+        requestAnimationFrame(() => {
+            node.querySelectorAll('textarea').forEach(autoResize);
+        });
 
-            function toggleInteractive() {
-                const isInteractive = document.getElementById('interactive-mode').checked;
-                const standard = document.getElementById('standard-runner');
-                const interactive = document.getElementById('interactive-runner');
-                
-                if (isInteractive) {
-                    standard.classList.add('hidden');
-                    interactive.classList.remove('hidden');
-                } else {
-                    standard.classList.remove('hidden');
-                    interactive.classList.add('hidden');
-                }
-                triggerSave();
-            }
+        return node;
+    }
 
-            function startInteractive() {
-                const history = document.getElementById('chat-history');
-                history.innerHTML = '';
-                
-                document.getElementById('interactiveStartBtn').classList.add('hidden');
-                document.getElementById('interactiveStopBtn').classList.remove('hidden');
-                
-                activeInputRow = null;
-                vscode.postMessage({ command: 'run-interactive' });
-                
-                createInputRow();
-            }
+    function updateCaseNode(node, testCase, index) {
+        const result = results.get(testCase.id);
+        node.querySelector('.case-number').textContent = '#' + (index + 1);
 
-            function stopInteractive() {
-                vscode.postMessage({ command: 'stop-interactive' });
-                appendMessage('system', 'Process Stopped by User.');
-                setInteractiveStoppedState();
-            }
-            
-            function setInteractiveStoppedState() {
-                document.getElementById('interactiveStartBtn').classList.remove('hidden');
-                document.getElementById('interactiveStopBtn').classList.add('hidden');
-                if (activeInputRow) {
-                    activeInputRow.remove();
-                    activeInputRow = null;
-                }
-            }
+        const statusTag = node.querySelector('.status-tag');
+        statusTag.textContent = result ? result.status : '';
+        statusTag.className = 'status-tag' + (result ? ' status-' + result.status : '');
 
-            function createInputRow() {
-                const history = document.getElementById('chat-history');
-                const row = document.createElement('div');
-                row.className = 'log-container';
-                row.style.zIndex = '1';
+        node.querySelector('.time-tag').textContent =
+            result && result.time !== undefined ? Math.round(result.time) + 'ms' : '';
 
-                const leftCell = document.createElement('div');
-                leftCell.className = 'log-cell left';
-                
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'inline-input';
-                input.placeholder = 'Type input here...';
-                input.onkeydown = handleInput;
-                
-                leftCell.appendChild(input);
-                
-                const rightCell = document.createElement('div');
-                rightCell.className = 'log-cell right';
+        node.classList.remove('AC', 'WA', 'RE', 'TLE');
+        if (result && result.status !== 'RUN') {
+            node.classList.add(result.status);
+        }
 
-                row.appendChild(leftCell);
-                row.appendChild(rightCell);
-                history.appendChild(row);
-                
-                activeInputRow = row;
-                
-                setTimeout(() => input.focus(), 10);
-                history.scrollTop = history.scrollHeight;
-            }
+        const outputBox = node.querySelector('.output-box');
+        const output = result && result.output !== undefined ? result.output : '';
+        if (outputBox.value !== output) {
+            outputBox.value = output;
+            autoResize(outputBox);
+        }
 
-            function handleInput(event) {
-                if (event.key === 'Enter') {
-                    const text = event.target.value;
-                    if (!text) return;
-                    
-                    const parent = event.target.parentElement;
-                    parent.innerHTML = '';
-                    parent.innerText = text;
-                    
-                    activeInputRow = null;
-                    
-                    vscode.postMessage({ command: 'interactive-input', text: text });
-                    
-                    createInputRow();
-                }
-            }
+        node.classList.toggle('collapsed', Boolean(result && result.collapsed));
+    }
 
-            function appendMessage(role, text) {
-                const history = document.getElementById('chat-history');
-                
-                if (role === 'system') {
-                    const div = document.createElement('div');
-                    div.className = 'msg-system';
-                    div.style.zIndex = '1';
-                    div.innerText = text;
-                    
-                    if (activeInputRow) {
-                        history.insertBefore(div, activeInputRow);
-                    } else {
-                        history.appendChild(div);
-                    }
-                } else {
-                    const row = document.createElement('div');
-                    row.className = 'log-container';
-                    row.style.zIndex = '1';
-                    
-                    const leftCell = document.createElement('div');
-                    leftCell.className = 'log-cell left';
-                    
-                    const rightCell = document.createElement('div');
-                    rightCell.className = 'log-cell right';
-                    
-                    if (role === 'solver') rightCell.innerText = text;
-                    else if (role === 'error') {
-                        rightCell.className += ' msg-error';
-                        rightCell.innerText = text;
-                    }
-                    
-                    row.appendChild(leftCell);
-                    row.appendChild(rightCell);
-                    
-                    if (activeInputRow) {
-                        history.insertBefore(row, activeInputRow);
-                    } else {
-                        history.appendChild(row);
-                    }
-                }
+    function autoResize(element) {
+        element.style.height = 'auto';
+        element.style.height = element.scrollHeight + 'px';
+    }
 
-                history.scrollTop = history.scrollHeight;
-            }
+    /* --- actions ----------------------------------------------------------- */
 
-            window.addEventListener('message', event => {
-                const msg = event.data;
-                
-                if (msg.type === 'restore-state') {
-                    const state = msg.state;
-                    if (state && state.view === 'workspace') {
-                         homeView.classList.add('hidden');
-                         workspaceView.classList.remove('hidden');
-                         problemContent.innerHTML = state.problemHtml || '';
-                         
-                         if (window.MathJax) {
-                            setTimeout(() => { window.MathJax.typesetPromise([problemContent]); }, 100);
-                         }
-                         
-                         if (state.testCases) {
-                             state.testCases.forEach(c => addTestCase(c.input, c.expected));
-                         }
-                         
-                         if (state.interactive) {
-                             document.getElementById('interactive-mode').checked = true;
-                         }
-                         toggleInteractive();
-                         
-                         switchTab(state.tab || 'runner');
-                    }
-                }
-                else if (msg.type === 'navigate') {
-                    if (msg.view === 'workspace') {
-                        homeView.classList.add('hidden');
-                        workspaceView.classList.remove('hidden');
-                        
-                        problemContent.innerHTML = msg.problemHtml || '';
-                        
-                        if (window.MathJax) {
-                            setTimeout(() => {
-                                window.MathJax.typesetPromise([problemContent]);
-                            }, 100);
-                        }
+    function addCase(input, expected) {
+        state.cases.push(createCase(input, expected));
+        render();
+        persist();
+    }
 
-                        switchTab(msg.tab || 'runner');
+    function cloneCase(id) {
+        const source = state.cases.find((testCase) => testCase.id === id);
+        if (source) {
+            addCase(source.input, source.expected);
+        }
+    }
 
-                        if (msg.initialData) {
-                            msg.initialData.forEach(c => addTestCase(c.input, c.expected));
-                        } else {
-                            addTestCase();
-                        }
-                        triggerSave();
-                    }
-                } 
-                else if (msg.type === 'status') {
-                     if (msg.value === 'Fetching...') {
-                         fetchBtn.innerText = 'Fetching...';
-                         fetchBtn.disabled = true;
-                     } else if (msg.value === 'Error') {
-                         fetchBtn.innerText = 'Fetch';
-                         fetchBtn.disabled = false;
-                     } else {
-                         runBtn.innerText = msg.value;
-                     }
-                }
-                else if (msg.type === 'finished') { runBtn.innerText = 'Run All'; runBtn.disabled = false; }
-                else if (msg.type === 'compile-error') { 
-                    runBtn.innerText = 'Error'; 
-                    runBtn.disabled = false; 
-                    vscode.postMessage({ command: 'showError', text: msg.output });
-                }
-                else if (msg.type === 'test-result') {
-                    const c = document.getElementById(msg.id);
-                    if (c) {
-                        const outBox = c.querySelector('.output-box');
-                        outBox.value = msg.output;
-                        autoResize(outBox);
-                        
-                        c.querySelector('.time-tag').innerText = Math.round(msg.time) + 'ms';
-                        const s = c.querySelector('.status-tag');
-                        s.innerText = msg.statusText; s.className = 'status-tag status-' + msg.statusText;
-                        c.classList.remove('AC', 'WA'); c.classList.add(msg.passed ? 'AC' : 'WA');
-                        if(msg.passed) c.classList.add('collapsed'); else c.classList.remove('collapsed');
-                    }
-                }
-                else if (msg.type === 'interactive-stdout') {
-                    appendMessage('solver', msg.data);
-                }
-                else if (msg.type === 'interactive-stderr') {
-                    appendMessage('error', msg.data);
-                }
-                else if (msg.type === 'interactive-system') {
-                    appendMessage('system', msg.value);
-                }
-                else if (msg.type === 'interactive-error') {
-                    appendMessage('error', msg.value);
-                }
-                else if (msg.type === 'interactive-exit') {
-                    appendMessage('system', 'Process Exited with code ' + msg.code);
-                    setInteractiveStoppedState();
-                }
-                else if (msg.type === 'interactive-stopped') {
-                    setInteractiveStoppedState();
-                }
+    function removeCase(id) {
+        state.cases = state.cases.filter((testCase) => testCase.id !== id);
+        results.delete(id);
+        render();
+        persist();
+    }
+
+    function toggleCollapsed(id) {
+        const result = results.get(id) || {};
+        result.collapsed = !result.collapsed;
+        results.set(id, result);
+        render();
+    }
+
+    function runCases(ids) {
+        const selected = state.cases.filter((testCase) => !ids || ids.indexOf(testCase.id) !== -1);
+        if (selected.length === 0) {
+            return;
+        }
+
+        hideCompileError();
+        selected.forEach((testCase) => {
+            results.set(testCase.id, { status: 'RUN', output: '', collapsed: false });
+        });
+        render();
+
+        setRunning(true, 'Compiling...');
+        vscode.postMessage({
+            command: 'run',
+            testCases: selected.map((testCase) => ({
+                id: testCase.id,
+                input: testCase.input,
+                expected: testCase.expected
+            }))
+        });
+    }
+
+    function setRunning(isRunning, label) {
+        els['runBtn'].disabled = isRunning;
+        els['runBtn'].textContent = isRunning ? (label || 'Running...') : 'Run All';
+    }
+
+    function showCompileError(output) {
+        els['compile-error-body'].textContent = output;
+        toggle(els['compile-error'], false);
+    }
+
+    function hideCompileError() {
+        toggle(els['compile-error'], true);
+        els['compile-error-body'].textContent = '';
+    }
+
+    function showParseUI() {
+        toggle(els['main-menu'], true);
+        toggle(els['parse-ui'], false);
+        toggle(els['parse-error'], true);
+    }
+
+    function hideParseUI() {
+        toggle(els['parse-ui'], true);
+        toggle(els['main-menu'], false);
+        setFetching(false);
+    }
+
+    function setFetching(isFetching) {
+        els['fetchBtn'].disabled = isFetching;
+        els['fetchBtn'].textContent = isFetching ? 'Fetching...' : 'Fetch';
+    }
+
+    function startParsing() {
+        const url = els['problem-url'].value.trim();
+        if (!url) {
+            return;
+        }
+        toggle(els['parse-error'], true);
+        setFetching(true);
+        vscode.postMessage({ command: 'parse-url', url });
+    }
+
+    function openWorkspace(problem, testCases) {
+        state.view = 'workspace';
+        state.hasSession = true;
+        state.tab = problem ? 'problem' : 'runner';
+        state.mode = 'standard';
+        state.problem = problem;
+        state.cases = (testCases && testCases.length > 0)
+            ? testCases.map((testCase) => createCase(testCase.input, testCase.expected))
+            : [createCase()];
+        results.clear();
+        hideCompileError();
+        render();
+        persist();
+    }
+
+    /** Going home only navigates; the session stays on disk and can be resumed. */
+    function goHome() {
+        state.view = 'home';
+        hideParseUI();
+        render();
+        persist();
+    }
+
+    function setTab(tab) {
+        state.tab = tab;
+        render();
+        if (tab === 'runner') {
+            requestAnimationFrame(() => {
+                document.querySelectorAll('#standard-runner textarea').forEach(autoResize);
             });
+        }
+        persist();
+    }
 
-window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-import-url')?.addEventListener('click', showParseUI);
-    document.getElementById('btn-manual-create')?.addEventListener('click', manualStart);
-    document.getElementById('fetchBtn')?.addEventListener('click', startParsing);
-    document.getElementById('btn-cancel-parse')?.addEventListener('click', hideParseUI);
-    document.getElementById('btn-gohome')?.addEventListener('click', goHome);
-    
-    document.getElementById('tab-btn-problem')?.addEventListener('click', () => switchTab('problem'));
-    document.getElementById('tab-btn-runner')?.addEventListener('click', () => switchTab('runner'));
-    
-    document.getElementById('interactive-mode')?.addEventListener('change', toggleInteractive);
-    document.getElementById('btn-interactive-mode-text')?.addEventListener('click', () => {
-        document.getElementById('interactive-mode').click();
+    function setMode(mode) {
+        state.mode = mode;
+        render();
+        persist();
+    }
+
+    /* --- interactive ------------------------------------------------------- */
+
+    function startInteractive() {
+        els['chat-history'].innerHTML = '';
+        toggle(els['interactiveStartBtn'], true);
+        toggle(els['interactiveStopBtn'], false);
+        activeInputRow = null;
+        vscode.postMessage({ command: 'run-interactive' });
+        createInputRow();
+    }
+
+    function stopInteractive() {
+        vscode.postMessage({ command: 'stop-interactive' });
+        appendMessage('system', 'Process stopped by user.');
+        setInteractiveStopped();
+    }
+
+    function setInteractiveStopped() {
+        toggle(els['interactiveStartBtn'], false);
+        toggle(els['interactiveStopBtn'], true);
+        if (activeInputRow) {
+            activeInputRow.remove();
+            activeInputRow = null;
+        }
+    }
+
+    function createInputRow() {
+        const history = els['chat-history'];
+        const row = document.createElement('div');
+        row.className = 'log-container';
+
+        const leftCell = document.createElement('div');
+        leftCell.className = 'log-cell left';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'inline-input';
+        input.placeholder = 'Type input here...';
+        input.addEventListener('keydown', handleInteractiveKey);
+
+        leftCell.appendChild(input);
+
+        const rightCell = document.createElement('div');
+        rightCell.className = 'log-cell right';
+
+        row.appendChild(leftCell);
+        row.appendChild(rightCell);
+        history.appendChild(row);
+
+        activeInputRow = row;
+        requestAnimationFrame(() => input.focus());
+        history.scrollTop = history.scrollHeight;
+    }
+
+    function handleInteractiveKey(event) {
+        if (event.key !== 'Enter') {
+            return;
+        }
+        const text = event.target.value;
+        if (!text) {
+            return;
+        }
+
+        const cell = event.target.parentElement;
+        cell.textContent = text;
+        activeInputRow = null;
+
+        vscode.postMessage({ command: 'interactive-input', text });
+        createInputRow();
+    }
+
+    function appendMessage(role, text) {
+        const history = els['chat-history'];
+        let node;
+
+        if (role === 'system') {
+            node = document.createElement('div');
+            node.className = 'msg-system';
+            node.textContent = text;
+        } else {
+            node = document.createElement('div');
+            node.className = 'log-container';
+
+            const leftCell = document.createElement('div');
+            leftCell.className = 'log-cell left';
+
+            const rightCell = document.createElement('div');
+            rightCell.className = 'log-cell right' + (role === 'error' ? ' error' : '');
+            rightCell.textContent = text;
+
+            node.appendChild(leftCell);
+            node.appendChild(rightCell);
+        }
+
+        if (activeInputRow) {
+            history.insertBefore(node, activeInputRow);
+        } else {
+            history.appendChild(node);
+        }
+        history.scrollTop = history.scrollHeight;
+    }
+
+    /* --- messages ---------------------------------------------------------- */
+
+    const handlers = {
+        'init': (msg) => {
+            if (msg.state) {
+                applyStoredState(msg.state);
+            }
+            render();
+        },
+        'problem-loaded': (msg) => {
+            setFetching(false);
+            openWorkspace(msg.problem, msg.testCases);
+        },
+        'status': (msg) => {
+            if (msg.scope === 'fetch') {
+                setFetching(msg.value === 'loading');
+                if (msg.value === 'error') {
+                    els['parse-error'].textContent = msg.message || 'Could not load that problem.';
+                    toggle(els['parse-error'], false);
+                }
+                return;
+            }
+            setRunning(true, msg.value);
+        },
+        'compile-error': (msg) => {
+            setRunning(false);
+            showCompileError(msg.output);
+            state.cases.forEach((testCase) => results.delete(testCase.id));
+            render();
+        },
+        'test-result': (msg) => {
+            results.set(msg.id, {
+                status: msg.statusText,
+                time: msg.time,
+                output: msg.output,
+                collapsed: msg.passed
+            });
+            render();
+        },
+        'finished': () => setRunning(false),
+        'interactive-stdout': (msg) => appendMessage('solver', msg.data),
+        'interactive-stderr': (msg) => appendMessage('error', msg.data),
+        'interactive-system': (msg) => appendMessage('system', msg.value),
+        'interactive-error': (msg) => appendMessage('error', msg.value),
+        'interactive-exit': (msg) => {
+            appendMessage('system', 'Process exited with code ' + msg.code);
+            setInteractiveStopped();
+        },
+        'interactive-stopped': () => setInteractiveStopped()
+    };
+
+    window.addEventListener('message', (event) => {
+        const handler = handlers[event.data.type];
+        if (handler) {
+            handler(event.data);
+        }
     });
-    
-    document.getElementById('btn-add-case')?.addEventListener('click', () => addTestCase());
-    document.getElementById('runBtn')?.addEventListener('click', runTests);
-    
-    document.getElementById('interactiveStartBtn')?.addEventListener('click', startInteractive);
-    document.getElementById('interactiveStopBtn')?.addEventListener('click', stopInteractive);
-});
+
+    /* --- wiring ------------------------------------------------------------ */
+
+    function wire() {
+        byId('btn-import-url').addEventListener('click', showParseUI);
+        byId('btn-manual-create').addEventListener('click', () => openWorkspace(null, []));
+        byId('btn-cancel-parse').addEventListener('click', hideParseUI);
+        byId('fetchBtn').addEventListener('click', startParsing);
+        byId('problem-url').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                startParsing();
+            }
+        });
+        byId('btn-resume').addEventListener('click', () => {
+            state.view = 'workspace';
+            render();
+            persist();
+        });
+
+        byId('btn-gohome').addEventListener('click', goHome);
+        byId('tab-btn-problem').addEventListener('click', () => setTab('problem'));
+        byId('tab-btn-runner').addEventListener('click', () => setTab('runner'));
+        byId('mode-standard').addEventListener('click', () => setMode('standard'));
+        byId('mode-interactive').addEventListener('click', () => setMode('interactive'));
+
+        byId('btn-add-case').addEventListener('click', () => addCase());
+        byId('runBtn').addEventListener('click', () => runCases(null));
+        byId('btn-copy-error').addEventListener('click', () => {
+            vscode.postMessage({ command: 'copy', text: els['compile-error-body'].textContent });
+        });
+
+        byId('interactiveStartBtn').addEventListener('click', startInteractive);
+        byId('interactiveStopBtn').addEventListener('click', stopInteractive);
+    }
+
+    cacheElements();
+    wire();
+    render();
+    vscode.postMessage({ command: 'ready' });
+}());
