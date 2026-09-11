@@ -437,8 +437,13 @@ body {
     overflow: hidden;
     background-color: var(--asym-raised);
     border: 1px solid var(--asym-border);
-    border-left: 3px solid transparent;
+    /* The left edge always carries the verdict, so an unrun case reads as pending, not blank. */
+    border-left: 3px solid var(--asym-muted);
     border-radius: var(--radius-md);
+}
+
+.test-case.RUN {
+    border-left-color: var(--asym-warn);
 }
 
 .test-case.AC {

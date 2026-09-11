@@ -265,8 +265,8 @@
         node.querySelector('.time-tag').textContent =
             result && result.time !== undefined ? Math.round(result.time) + 'ms' : '';
 
-        node.classList.remove('AC', 'WA', 'RE', 'TLE');
-        if (result && result.status !== 'RUN') {
+        node.classList.remove('RUN', 'AC', 'WA', 'RE', 'TLE');
+        if (result) {
             node.classList.add(result.status);
         }
 
