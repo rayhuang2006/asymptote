@@ -1,0 +1,50 @@
+name: Publish
+
+# Publishes whatever version package.json currently declares.
+#
+# The release workflow only publishes on the run that creates a release, so a
+# publish that fails there cannot be recovered by re-running the job: the release
+# already exists, the condition is false, and the step is skipped. This workflow
+# is the way back in.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Package only, do not publish'
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read the version
+        id: version
+        run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        run: npx @vscode/vsce@3.9.2 package --out "asymptote-${{ steps.version.outputs.value }}.vsix"
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: asymptote-${{ steps.version.outputs.value }}
+          path: '*.vsix'
+
+      - name: Publish to VS Code Marketplace
+        if: ${{ !inputs.dry_run }}
+        run: bash .github/scripts/publish.sh "asymptote-${{ steps.version.outputs.value }}.vsix"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
