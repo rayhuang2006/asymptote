@@ -21,7 +21,7 @@
     "onLanguage:python",
     "onLanguage:java"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
       "secondarySidebar": [
@@ -93,13 +93,17 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "vscode:prepublish": "npm run package",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "check-types": "tsc --noEmit",
+    "compile-tests": "tsc -p ./",
     "lint": "eslint src",
-    "test:vscode": "vscode-test",
+    "pretest": "npm run compile-tests && npm run lint",
     "test": "mocha -r ts-node/register/transpile-only tests/**/*.test.ts",
+    "pretest:vscode": "npm run compile-tests && node esbuild.js",
+    "test:vscode": "vscode-test",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -108,22 +112,24 @@
     "@types/vscode": "^1.108.1",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
+    "cheerio": "^1.2.0",
+    "chrome-finder": "^1.0.7",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "mocha": "^11.7.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.52.0"
-  },
-  "dependencies": {
-    "axios": "^1.13.2",
-    "cheerio": "^1.2.0",
-    "chrome-finder": "^1.0.7",
     "puppeteer-core": "^24.1.1",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.52.0",
     "web-tree-sitter": "^0.20.8"
+  },
+  "dependencies": {
+    "clone-deep": "^4.0.1",
+    "merge-deep": "^3.0.3"
   },
   "lint-staged": {
     "src/**/*.ts": [

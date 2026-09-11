@@ -43,7 +43,7 @@ See the Big O notation directly above your C++ functions. Asymptote parses your 
   * **Confidence System:** Marks analysis with `(?)` if unknown functions or opaque external calls are detected.
   * **Toggleable:** Use `Asymptote: Toggle Complexity Lens` to show/hide the analysis instantly.
 
-![Complexity Analysis Demo](images/demo1.gif)
+![Complexity Analysis Demo](https://raw.githubusercontent.com/rayhuang2006/asymptote/main/images/demo1.gif)
 
 ### 2\. Local Judge (Runner)
 
@@ -54,7 +54,7 @@ A dedicated sidebar for managing test cases without leaving your editor—acting
   * **Verdict Display:** Clear **AC**, **WA**, **TLE**, or **RE** status with execution time.
   * **Strict Comparison Mode:** Option to enforce exact character-for-character matching for outputs, including trailing whitespaces.
 
-![Runner Demo](images/demo2.gif)
+![Runner Demo](https://raw.githubusercontent.com/rayhuang2006/asymptote/main/images/demo2.gif)
 
 ### 3\. Interactive Mode (Manual Judge)
 
