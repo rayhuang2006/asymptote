@@ -42,7 +42,7 @@ export const ncuOjAdapter: SiteAdapter = {
 
         return {
             title: problem.title,
-            timeLimit: problem.time_limit ? `${problem.time_limit / 1000} seconds` : "",
+            timeLimit: formatSeconds(problem.time_limit),
             memoryLimit: problem.memory_limit ? `${problem.memory_limit} MB` : "",
             htmlContent: buildStatement(problem),
             testCases: samples.map((sample, index) =>
@@ -50,6 +50,14 @@ export const ncuOjAdapter: SiteAdapter = {
         };
     }
 };
+
+function formatSeconds(milliseconds: number | undefined): string {
+    if (!milliseconds) {
+        return "";
+    }
+    const seconds = milliseconds / 1000;
+    return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+}
 
 function buildStatement(problem: NcuProblem): string {
     const sections: [string, string | undefined][] = [
