@@ -8,9 +8,20 @@
 set -uo pipefail
 
 PACKAGE="${1:?usage: publish.sh <path to vsix>}"
-ATTEMPTS="${PUBLISH_ATTEMPTS:-5}"
-DELAY="${PUBLISH_DELAY:-15}"
+# Each failed attempt costs three minutes: that is typed-rest-client's socket
+# timeout, and it is what "Request timeout: /_apis/gallery" actually means.
+ATTEMPTS="${PUBLISH_ATTEMPTS:-3}"
+DELAY="${PUBLISH_DELAY:-20}"
 VSCE="${VSCE_COMMAND:-npx @vscode/vsce@3.9.2}"
+
+echo "::group::Marketplace reachability"
+node "$(dirname "$0")/diagnose-marketplace.js" || echo "diagnostic failed to run"
+echo "::endgroup::"
+
+# The host publishes AAAA records and GitHub's hosted runners have no IPv6 route.
+# An address that drops packets rather than refusing them looks exactly like a
+# server that never answers, so prefer the family the runner can actually use.
+export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"
 
 for attempt in $(seq 1 "$ATTEMPTS"); do
     echo "::group::Publish attempt ${attempt} of ${ATTEMPTS}"
