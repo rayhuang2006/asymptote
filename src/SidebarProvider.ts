@@ -160,6 +160,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     return {
       onStatus: (value) => this.post({ type: "status", scope: "run", value }),
       onCompileError: (output) => this.post({ type: "compile-error", output }),
+      onToolchainMissing: (message) =>
+        this.post({ type: "run-error", title: "Missing toolchain", output: message }),
       onTestResult: (outcome) => this.post({ type: "test-result", ...outcome }),
       onFinished: () => this.post({ type: "finished" }),
       onInteractiveSystem: (value) => this.post({ type: "interactive-system", value }),

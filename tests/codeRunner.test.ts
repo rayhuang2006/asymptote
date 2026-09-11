@@ -13,11 +13,13 @@ function writeProgram(body: string): string {
     return file;
 }
 
-function collect(): { events: RunnerEvents; outcomes: TestOutcome[] } {
+function collect(): { events: RunnerEvents; outcomes: TestOutcome[]; toolchain: string[] } {
     const outcomes: TestOutcome[] = [];
+    const toolchain: string[] = [];
     const events: RunnerEvents = {
         onStatus: () => undefined,
         onCompileError: () => undefined,
+        onToolchainMissing: (message) => toolchain.push(message),
         onTestResult: (outcome) => outcomes.push(outcome),
         onFinished: () => undefined,
         onInteractiveSystem: () => undefined,
@@ -27,10 +29,49 @@ function collect(): { events: RunnerEvents; outcomes: TestOutcome[] } {
         onInteractiveExit: () => undefined,
         onInteractiveStopped: () => undefined
     };
-    return { events, outcomes };
+    return { events, outcomes, toolchain };
 }
 
 describe('Code runner', () => {
+    it('explains a missing interpreter instead of taking the extension down', async function () {
+        this.timeout(20000);
+        const { events, outcomes, toolchain } = collect();
+        const file = writeProgram('print("hi")\n');
+
+        // The strategy is supplied so the test does not depend on what this machine
+        // happens to have installed.
+        const runner = new CodeRunner(events, () => ({
+            compileCommand: undefined,
+            runCommand: 'asymptote-no-such-interpreter',
+            runArgs: [file],
+            cleanupFiles: []
+        }));
+
+        await runner.runTests(file, [{ id: 'case-1', input: '', expected: 'hi' }], { strict: false, timeoutMs: 5000 });
+
+        assert.strictEqual(outcomes.length, 0, 'a missing interpreter is not a verdict');
+        assert.strictEqual(toolchain.length, 1);
+        assert.match(toolchain[0], /was not found on your PATH/);
+    });
+
+    it('explains a missing compiler', async function () {
+        this.timeout(20000);
+        const { events, toolchain } = collect();
+        const file = writeProgram('print("hi")\n');
+
+        const runner = new CodeRunner(events, () => ({
+            compileCommand: 'asymptote-no-such-compiler --version',
+            runCommand: 'python3',
+            runArgs: [file],
+            cleanupFiles: []
+        }));
+
+        await runner.runTests(file, [{ id: 'case-1', input: '', expected: 'hi' }], { strict: false, timeoutMs: 5000 });
+
+        assert.strictEqual(toolchain.length, 1);
+        assert.match(toolchain[0], /asymptote-no-such-compiler was not found on your PATH/);
+    });
+
     it('judges a slow solution against the limit it is given', async function () {
         this.timeout(20000);
         const file = writeProgram('import time\ntime.sleep(0.6)\nprint("done")\n');

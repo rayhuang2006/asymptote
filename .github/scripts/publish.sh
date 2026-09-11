@@ -42,12 +42,21 @@ export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"
 
 for attempt in $(seq 1 "$ATTEMPTS"); do
     echo "::group::Publish attempt ${attempt} of ${ATTEMPTS}"
-    if $VSCE publish --packagePath "$PACKAGE" --skip-duplicate -p "$VSCE_PAT"; then
-        echo "::endgroup::"
-        echo "Published on attempt ${attempt}."
+    output=$($VSCE publish --packagePath "$PACKAGE" --skip-duplicate -p "$VSCE_PAT" 2>&1)
+    status=$?
+    echo "$output"
+    echo "::endgroup::"
+
+    if [ "$status" -eq 0 ]; then
+        # --skip-duplicate exits zero without uploading anything, which must not be
+        # reported as a successful publish.
+        if echo "$output" | grep -q "already published"; then
+            echo "Nothing was uploaded: this version is already on the Marketplace."
+        else
+            echo "Published on attempt ${attempt}."
+        fi
         exit 0
     fi
-    echo "::endgroup::"
 
     if [ "$attempt" -lt "$ATTEMPTS" ]; then
         echo "Attempt ${attempt} failed; retrying in ${DELAY}s."
