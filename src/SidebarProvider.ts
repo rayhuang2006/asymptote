@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { Scraper } from "./utils/Scraper";
+import { ProblemFetcher } from "./scraper/ProblemFetcher";
 import { CodeRunner, RunnerEvents, TestCase } from "./runner/CodeRunner";
 import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
 import { getWebviewHtml } from "./webview/WebviewHtml";
@@ -15,7 +15,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly context: vscode.ExtensionContext
+    private readonly context: vscode.ExtensionContext,
+    private readonly fetcher: ProblemFetcher
   ) {
     this.runner = new CodeRunner(this.createRunnerEvents());
   }
@@ -74,7 +75,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this.post({ type: "status", scope: "fetch", value: "loading" });
 
     try {
-      const problem = await Scraper.parse(url);
+      const problem = await this.fetcher.fetch(url);
       this.post({
         type: "problem-loaded",
         problem: {
@@ -87,7 +88,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       });
     } catch (error: any) {
       const reason = error?.message ?? String(error);
-      vscode.window.showErrorMessage(`Scraping Failed: ${reason}`);
       this.post({ type: "status", scope: "fetch", value: "error", message: reason });
     }
   }
