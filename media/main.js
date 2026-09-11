@@ -1,4 +1,4 @@
-(function () {
+(function (global) {
     'use strict';
 
     const vscode = acquireVsCodeApi();
@@ -34,8 +34,8 @@
         [
             'home-view', 'workspace-view', 'main-menu', 'parse-ui', 'parse-error',
             'problem-url', 'fetchBtn', 'btn-resume', 'problem-content', 'problem-meta',
-            'test-cases-container', 'cases-empty', 'runBtn', 'compile-error',
-            'compile-error-body', 'standard-runner', 'interactive-runner',
+            'test-cases-container', 'cases-empty', 'runBtn', 'runner-error',
+            'runner-error-title', 'runner-error-body', 'standard-runner', 'interactive-runner',
             'mode-standard', 'mode-interactive', 'chat-history',
             'interactiveStartBtn', 'interactiveStopBtn',
             'tab-btn-problem', 'tab-btn-runner', 'content-problem', 'content-runner'
@@ -200,7 +200,11 @@
             '<div class="case-body">' +
                 '<span class="label">Input</span><textarea class="input-box" rows="2"></textarea>' +
                 '<span class="label">Expected</span><textarea class="expected-box" rows="2"></textarea>' +
-                '<span class="label">Actual</span><textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>' +
+                '<div class="case-output">' +
+                    '<span class="label">Actual</span>' +
+                    '<textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>' +
+                '</div>' +
+                '<div class="case-diff hidden"></div>' +
             '</div>';
 
         const inputBox = node.querySelector('.input-box');
@@ -257,13 +261,151 @@
         }
 
         const outputBox = node.querySelector('.output-box');
+        outputBox.placeholder = placeholderFor(result);
         const output = result && result.output !== undefined ? result.output : '';
         if (outputBox.value !== output) {
             outputBox.value = output;
             autoResize(outputBox);
         }
 
+        renderDiff(node, testCase, result);
+
         node.classList.toggle('collapsed', Boolean(result && result.collapsed));
+    }
+
+    /**
+     * A wrong answer is shown as a unified diff instead of two boxes to eyeball, because
+     * the difference is often a single line or an invisible trailing space.
+     */
+    function placeholderFor(result) {
+        if (!result) {
+            return 'waiting...';
+        }
+        if (result.status === 'RUN') {
+            return 'running...';
+        }
+        if (result.status === 'TLE') {
+            return 'timed out before printing anything';
+        }
+        if (result.status === 'RE') {
+            return 'crashed before printing anything';
+        }
+        return 'no output';
+    }
+
+    function renderDiff(node, testCase, result) {
+        const host = node.querySelector('.case-diff');
+        const outputSection = node.querySelector('.case-output');
+        const showDiff = Boolean(result) && result.status === 'WA' && testCase.expected !== '';
+
+        toggle(host, !showDiff);
+        toggle(outputSection, showDiff);
+
+        if (!showDiff) {
+            host.textContent = '';
+            return;
+        }
+
+        const comparison = global.AsymptoteDiff.compare(testCase.expected, result.output);
+        host.textContent = '';
+        host.appendChild(buildDiffSummary(comparison));
+
+        if (comparison.truncated) {
+            return;
+        }
+
+        const table = document.createElement('div');
+        table.className = 'diff-table';
+        comparison.rows.forEach((row) => appendDiffRows(table, row));
+        host.appendChild(table);
+    }
+
+    function buildDiffSummary(comparison) {
+        const summary = document.createElement('p');
+        summary.className = 'diff-summary';
+
+        if (comparison.truncated) {
+            summary.textContent = 'Output is too long to diff; compare the boxes above.';
+        } else if (comparison.whitespaceOnly) {
+            summary.textContent = 'Differs only in whitespace (line ' + comparison.firstMismatch + ').';
+        } else {
+            summary.textContent = 'First difference on line ' + comparison.firstMismatch + '.';
+        }
+
+        return summary;
+    }
+
+    function appendDiffRows(table, row) {
+        if (row.type === 'same') {
+            table.appendChild(buildDiffRow('same', row.expectedLine, ' ', row.expected));
+            return;
+        }
+        if (row.type === 'changed') {
+            table.appendChild(buildDiffRow('removed', row.expectedLine, '-', row.expected));
+            table.appendChild(buildDiffRow('added', row.actualLine, '+', row.actual));
+            return;
+        }
+        if (row.type === 'missing') {
+            table.appendChild(buildDiffRow('removed', row.expectedLine, '-', row.expected));
+            return;
+        }
+        table.appendChild(buildDiffRow('added', row.actualLine, '+', row.actual));
+    }
+
+    function buildDiffRow(kind, lineNumber, marker, text) {
+        const line = document.createElement('div');
+        line.className = 'diff-line ' + kind;
+
+        const gutter = document.createElement('span');
+        gutter.className = 'diff-gutter';
+        gutter.textContent = lineNumber === null ? '' : String(lineNumber);
+
+        const sign = document.createElement('span');
+        sign.className = 'diff-sign';
+        sign.textContent = marker;
+
+        const content = document.createElement('span');
+        content.className = 'diff-text';
+        appendTextWithVisibleSpaces(content, text);
+
+        line.appendChild(gutter);
+        line.appendChild(sign);
+        line.appendChild(content);
+        return line;
+    }
+
+    /**
+     * Leading and trailing spaces are the difference you cannot see, so they are drawn
+     * as shaded blocks rather than left to the reader to guess at.
+     */
+    function appendTextWithVisibleSpaces(host, text) {
+        if (text === '') {
+            host.appendChild(document.createTextNode('\u00a0'));
+            return;
+        }
+
+        const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(text);
+        const leading = match[1];
+        const body = match[2];
+        const trailing = match[3];
+
+        if (leading) {
+            host.appendChild(buildWhitespaceMarker(leading));
+        }
+        if (body) {
+            host.appendChild(document.createTextNode(body));
+        }
+        if (trailing) {
+            host.appendChild(buildWhitespaceMarker(trailing));
+        }
+    }
+
+    function buildWhitespaceMarker(whitespace) {
+        const marker = document.createElement('span');
+        marker.className = 'diff-whitespace';
+        marker.textContent = whitespace;
+        marker.title = whitespace.length + ' whitespace character' + (whitespace.length === 1 ? '' : 's');
+        return marker;
     }
 
     function autoResize(element) {
@@ -306,7 +448,7 @@
             return;
         }
 
-        hideCompileError();
+        hideRunnerError();
         selected.forEach((testCase) => {
             results.set(testCase.id, { status: 'RUN', output: '', collapsed: false });
         });
@@ -328,14 +470,15 @@
         els['runBtn'].textContent = isRunning ? (label || 'Running...') : 'Run All';
     }
 
-    function showCompileError(output) {
-        els['compile-error-body'].textContent = output;
-        toggle(els['compile-error'], false);
+    function showRunnerError(title, output) {
+        els['runner-error-title'].textContent = title;
+        els['runner-error-body'].textContent = output;
+        toggle(els['runner-error'], false);
     }
 
-    function hideCompileError() {
-        toggle(els['compile-error'], true);
-        els['compile-error-body'].textContent = '';
+    function hideRunnerError() {
+        toggle(els['runner-error'], true);
+        els['runner-error-body'].textContent = '';
     }
 
     function showParseUI() {
@@ -375,7 +518,7 @@
             ? testCases.map((testCase) => createCase(testCase.input, testCase.expected))
             : [createCase()];
         results.clear();
-        hideCompileError();
+        hideRunnerError();
         render();
         persist();
     }
@@ -533,7 +676,13 @@
         },
         'compile-error': (msg) => {
             setRunning(false);
-            showCompileError(msg.output);
+            showRunnerError('Compilation failed', msg.output);
+            state.cases.forEach((testCase) => results.delete(testCase.id));
+            render();
+        },
+        'run-error': (msg) => {
+            setRunning(false);
+            showRunnerError(msg.title, msg.output);
             state.cases.forEach((testCase) => results.delete(testCase.id));
             render();
         },
@@ -592,7 +741,7 @@
         byId('btn-add-case').addEventListener('click', () => addCase());
         byId('runBtn').addEventListener('click', () => runCases(null));
         byId('btn-copy-error').addEventListener('click', () => {
-            vscode.postMessage({ command: 'copy', text: els['compile-error-body'].textContent });
+            vscode.postMessage({ command: 'copy', text: els['runner-error-body'].textContent });
         });
 
         byId('interactiveStartBtn').addEventListener('click', startInteractive);
@@ -603,4 +752,4 @@
     wire();
     render();
     vscode.postMessage({ command: 'ready' });
-}());
+}(typeof globalThis === 'undefined' ? this : globalThis));

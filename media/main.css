@@ -543,14 +543,14 @@ textarea:focus {
 
 /* --- Compile error --------------------------------------------------------- */
 
-.compile-error {
+.runner-error {
     flex: none;
     background-color: var(--vscode-inputValidation-errorBackground, var(--asym-raised));
     border: 1px solid var(--vscode-inputValidation-errorBorder, var(--asym-fail));
     border-radius: var(--radius-md);
 }
 
-.compile-error-header {
+.runner-error-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -562,7 +562,7 @@ textarea:focus {
     color: var(--asym-fail);
 }
 
-.compile-error pre {
+.runner-error pre {
     max-height: 220px;
     margin: 0;
     padding: var(--sp-2);
@@ -654,4 +654,81 @@ textarea:focus {
 .inline-input::placeholder {
     font-style: italic;
     opacity: 0.5;
+}
+
+/* --- Output diff ----------------------------------------------------------- */
+
+.case-diff {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+}
+
+.diff-summary {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--asym-muted);
+}
+
+.diff-table {
+    max-height: 260px;
+    overflow: auto;
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--fs-md);
+    line-height: 1.5;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--asym-border));
+    border-radius: var(--radius-sm);
+}
+
+.diff-line {
+    display: flex;
+    align-items: baseline;
+    white-space: pre;
+}
+
+.diff-line.removed {
+    background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.16));
+}
+
+.diff-line.added {
+    background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(63, 185, 80, 0.16));
+}
+
+.diff-gutter {
+    flex: none;
+    width: 2.5em;
+    padding-right: var(--sp-1);
+    color: var(--asym-muted);
+    text-align: right;
+    user-select: none;
+}
+
+.diff-sign {
+    flex: none;
+    width: 1.2em;
+    color: var(--asym-muted);
+    text-align: center;
+    user-select: none;
+}
+
+.diff-line.removed .diff-sign {
+    color: var(--asym-fail);
+}
+
+.diff-line.added .diff-sign {
+    color: var(--asym-pass);
+}
+
+.diff-whitespace {
+    background-color: var(--vscode-editorWhitespace-foreground, rgba(128, 128, 128, 0.35));
+    border-radius: 2px;
+}
+
+.diff-text {
+    flex: 1;
+    min-width: 0;
+    padding-right: var(--sp-2);
+    white-space: pre-wrap;
+    word-break: break-word;
 }

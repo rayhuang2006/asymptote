@@ -93,7 +93,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private async runTests(testCases: TestCase[]): Promise<void> {
     const filePath = await this.saveActiveFile();
     if (!filePath) {
-      this.post({ type: "finished" });
+      this.post({
+        type: "run-error",
+        title: "Nothing to run",
+        output: "Open the solution you want to test in an editor, then run again."
+      });
       return;
     }
 
@@ -107,6 +111,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private async runInteractive(): Promise<void> {
     const filePath = await this.saveActiveFile();
     if (!filePath) {
+      this.post({ type: "interactive-error", value: "Open the solution you want to run in an editor, then start again." });
       this.post({ type: "interactive-stopped" });
       return;
     }
@@ -116,7 +121,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private async saveActiveFile(): Promise<string | undefined> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showErrorMessage("No active editor found");
       return undefined;
     }
     await editor.document.save();
