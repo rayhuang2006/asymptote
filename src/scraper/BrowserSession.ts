@@ -2,11 +2,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import puppeteer from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import puppeteer from "puppeteer-core";
 const chromeFinder = require("chrome-finder");
-
-puppeteer.use(StealthPlugin());
 
 /** Launching a browser costs several seconds; a page load costs a fraction of one. */
 const IDLE_SHUTDOWN_MS = 5 * 60 * 1000;

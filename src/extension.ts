@@ -2,13 +2,19 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { SidebarProvider } from './SidebarProvider';
 import { ProblemFetcher } from './scraper/ProblemFetcher';
+import { ParsedProblem } from './scraper/types';
+
+/** What the extension exposes to other extensions, and to the packaging check. */
+export interface AsymptoteApi {
+    fetchProblem(url: string): Promise<ParsedProblem>;
+}
 import { analyzeBlock } from './analyzer/ASTAnalyzer';
 
 const Parser = require('web-tree-sitter');
 
 const MAX_LINE_COUNT = 5000;
 
-export async function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext): Promise<AsymptoteApi | undefined> {
     try {
         await Parser.init();
         const parsersPath = path.join(context.extensionPath, 'parsers');
@@ -59,8 +65,11 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }));
 
+        return { fetchProblem: (url: string) => fetcher.fetch(url) };
+
     } catch (error) {
         vscode.window.showErrorMessage('Asymptote failed to start: ' + error);
+        return undefined;
     }
 }
 
