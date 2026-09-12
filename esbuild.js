@@ -50,10 +50,8 @@ async function main() {
         platform: 'node',
         target: 'node20',
         outfile: 'dist/extension.js',
-        // vscode is provided by the editor. clone-deep and merge-deep reach their own
-        // dependencies through lazy-cache, which resolves module names at runtime, so
-        // bundling them yields an empty utils object and the stealth plugin throws.
-        external: ['vscode', 'clone-deep', 'merge-deep'],
+        // Provided by the editor at runtime, never bundled.
+        external: ['vscode'],
         minify: production,
         sourcemap: !production,
         sourcesContent: false,

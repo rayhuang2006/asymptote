@@ -10,7 +10,7 @@ set -uo pipefail
 PACKAGE="${1:?usage: publish.sh <path to vsix>}"
 # Each failed attempt costs three minutes: that is typed-rest-client's socket
 # timeout, and it is what "Request timeout: /_apis/gallery" actually means.
-ATTEMPTS="${PUBLISH_ATTEMPTS:-3}"
+ATTEMPTS="${PUBLISH_ATTEMPTS:-4}"
 DELAY="${PUBLISH_DELAY:-20}"
 VSCE="${VSCE_COMMAND:-npx @vscode/vsce@3.9.2}"
 

@@ -99,7 +99,8 @@
     "test": "mocha -r ts-node/register/transpile-only tests/**/*.test.ts",
     "pretest:vscode": "npm run compile-tests && node esbuild.js",
     "test:vscode": "vscode-test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "verify-package": "node .github/scripts/verify-package.js"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -115,16 +116,10 @@
     "lint-staged": "^16.4.0",
     "mocha": "^11.7.5",
     "puppeteer-core": "^24.1.1",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.52.0",
     "web-tree-sitter": "^0.20.8"
-  },
-  "dependencies": {
-    "clone-deep": "^4.0.1",
-    "merge-deep": "^3.0.3"
   },
   "lint-staged": {
     "src/**/*.ts": [

@@ -13,6 +13,10 @@ on:
         description: 'Package only, do not publish'
         type: boolean
         default: false
+      diagnostics:
+        description: 'Report what the runner can reach before publishing'
+        type: boolean
+        default: false
 
 jobs:
   publish:
@@ -48,3 +52,4 @@ jobs:
         run: bash .github/scripts/publish.sh "asymptote-${{ steps.version.outputs.value }}.vsix"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          PUBLISH_DIAGNOSTICS: ${{ inputs.diagnostics && '1' || '' }}
