@@ -72,7 +72,7 @@ body {
 .stack-tight {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
 }
 
 /* --- Buttons --------------------------------------------------------------- */
@@ -130,14 +130,17 @@ body {
 }
 
 .btn-dashed {
+    align-self: flex-start;
+    width: auto;
+    padding: var(--sp-1) var(--sp-2);
     background: transparent;
-    color: var(--asym-accent);
-    border: 1px dashed var(--asym-border);
+    color: var(--asym-muted);
+    border: none;
     font-weight: 500;
 }
 
 .btn-dashed:hover:not(:disabled) {
-    border-color: var(--asym-accent);
+    color: var(--asym-accent);
     background-color: var(--asym-hover);
 }
 
@@ -259,8 +262,8 @@ body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2) var(--sp-3);
-    padding: var(--sp-2) var(--sp-3);
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
     border-bottom: 1px solid var(--asym-border);
 }
 
@@ -280,6 +283,7 @@ body {
 
 .btn-run {
     order: 6;
+    margin-left: auto;
 }
 
 .problem-slot {
@@ -406,6 +410,7 @@ body {
     width: auto;
     flex: none;
     padding: var(--sp-1) var(--sp-4);
+    font-size: var(--fs-md);
 }
 
 /* --- Forms and small type -------------------------------------------------- */
@@ -418,10 +423,8 @@ body {
 
 .field-label,
 .label {
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     color: var(--asym-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .text-input {
@@ -467,6 +470,7 @@ body {
     flex: none;
     display: flex;
     padding: 2px;
+    order: 5;
     background-color: var(--asym-raised);
     border: 1px solid var(--asym-border);
     border-radius: var(--radius-md);
@@ -474,9 +478,10 @@ body {
 
 .mode-option {
     flex: 1;
-    padding: var(--sp-1) var(--sp-2);
+    padding: 3px var(--sp-3);
     font-family: inherit;
     font-size: var(--fs-md);
+    white-space: nowrap;
     color: var(--asym-muted);
     background: transparent;
     border: none;
@@ -489,8 +494,8 @@ body {
 }
 
 .mode-option.active {
-    color: var(--vscode-button-foreground);
-    background-color: var(--vscode-button-background);
+    color: var(--asym-fg);
+    background-color: var(--asym-hover);
 }
 
 /* --- Problem statement ----------------------------------------------------- */
@@ -523,11 +528,13 @@ body {
 
 .test-case {
     overflow: hidden;
+    /* The left edge carries the verdict; nothing else needs an outline. */
+    border-left: 2px solid var(--asym-muted);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.test-case:not(.collapsed) {
     background-color: var(--asym-raised);
-    border: 1px solid var(--asym-border);
-    /* The left edge always carries the verdict, so an unrun case reads as pending, not blank. */
-    border-left: 3px solid var(--asym-muted);
-    border-radius: var(--radius-md);
 }
 
 .test-case.RUN {
@@ -551,13 +558,17 @@ body {
     gap: var(--sp-2);
     padding: var(--sp-1) var(--sp-2);
     font-size: var(--fs-md);
-    font-weight: 600;
     cursor: pointer;
     user-select: none;
 }
 
 .case-header:hover {
     background-color: var(--asym-hover);
+}
+
+.case-number {
+    font-weight: 600;
+    color: var(--asym-muted);
 }
 
 .case-summary {
@@ -582,9 +593,8 @@ body {
 .case-body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: var(--sp-3);
-    padding: var(--sp-2) var(--sp-3) var(--sp-3);
-    border-top: 1px solid var(--asym-border);
+    gap: var(--sp-2) var(--sp-3);
+    padding: 0 var(--sp-2) var(--sp-2) var(--sp-2);
 }
 
 .case-column {
@@ -629,10 +639,10 @@ textarea {
     box-sizing: border-box;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
-    line-height: 1.4;
+    line-height: 1.45;
     color: var(--vscode-input-foreground);
     background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--asym-border));
+    border: none;
     border-radius: var(--radius-sm);
     resize: none;
     overflow-y: hidden;
@@ -640,6 +650,11 @@ textarea {
 
 textarea:focus {
     outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+textarea[readonly] {
+    color: var(--asym-muted);
 }
 
 /* --- Compile error --------------------------------------------------------- */
@@ -765,11 +780,12 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
+    min-width: 0;
 }
 
 .diff-summary {
     margin: 0;
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     color: var(--asym-muted);
 }
 
@@ -778,9 +794,8 @@ textarea:focus {
     overflow: auto;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
-    line-height: 1.5;
+    line-height: 1.45;
     background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--asym-border));
     border-radius: var(--radius-sm);
 }
 

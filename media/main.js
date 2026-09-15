@@ -282,15 +282,15 @@
             '<div class="case-body">' +
                 '<div class="case-column">' +
                     '<span class="label">Input</span>' +
-                    '<textarea class="input-box" rows="2"></textarea>' +
+                    '<textarea class="input-box" rows="1"></textarea>' +
                 '</div>' +
                 '<div class="case-column">' +
                     '<span class="label">Expected</span>' +
-                    '<textarea class="expected-box" rows="2"></textarea>' +
+                    '<textarea class="expected-box" rows="1"></textarea>' +
                 '</div>' +
                 '<div class="case-column case-output">' +
                     '<span class="label">Actual</span>' +
-                    '<textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>' +
+                    '<textarea class="output-box" rows="1" readonly placeholder="waiting..."></textarea>' +
                 '</div>' +
                 '<div class="case-column case-diff hidden"></div>' +
             '</div>';
