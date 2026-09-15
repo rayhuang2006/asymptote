@@ -4,6 +4,13 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.8.0](https://github.com/rayhuang2006/asymptote/compare/v0.7.0...v0.8.0) (2026-09-15)
+
+
+### Features
+
+* **webview:** give importing to the problem, and test cases to their file ([#59](https://github.com/rayhuang2006/asymptote/issues/59)) ([7a1d027](https://github.com/rayhuang2006/asymptote/commit/7a1d02713ab07cab4c1e78360453a530cada2ead))
+
 ## [0.7.0](https://github.com/rayhuang2006/asymptote/compare/v0.6.3...v0.7.0) (2026-09-15)
 
 
