@@ -5,13 +5,15 @@ import { CodeRunner, RunnerEvents, TestCase } from "./runner/CodeRunner";
 import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
 import { resolveTimeLimit } from "./runner/timeLimit";
 import { getWebviewHtml } from "./webview/WebviewHtml";
-import { WorkspaceState, migrateState } from "./webview/WorkspaceState";
-
-const STATE_KEY = "asymptote-state";
+import { WorkspaceState } from "./webview/WorkspaceState";
+import { SessionStore } from "./webview/SessionStore";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private readonly runner: CodeRunner;
+  private readonly sessions: SessionStore;
+  /** The source file the panel is currently showing. */
+  private boundFile?: string;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -19,6 +21,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private readonly fetcher: ProblemFetcher
   ) {
     this.runner = new CodeRunner(this.createRunnerEvents());
+    this.sessions = new SessionStore(context.workspaceState);
+
+    context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(() => this.followActiveEditor())
+    );
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -38,7 +45,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     switch (message.command) {
       case "ready":
         // The webview drives the handshake, so restoring state is no longer a race against a timer.
-        this.post({ type: "init", state: this.loadState() });
+        this.boundFile = activeSourceFile();
+        this.sendSession();
         break;
       case "run":
         await this.runTests(message.testCases, message.timeLimit);
@@ -56,7 +64,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         await this.parseUrl(message.url);
         break;
       case "save-state":
-        await this.context.workspaceState.update(STATE_KEY, message.state);
+        await this.sessions.write(this.boundFile, message.state);
         break;
       case "copy":
         await vscode.env.clipboard.writeText(message.text ?? "");
@@ -80,8 +88,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this.post({ type: "import-problem" });
   }
 
+  /**
+   * Switches the panel to whichever source file is in front of the reader. Files the
+   * runner cannot run, and the panel's own webview, leave it where it is.
+   */
+  private followActiveEditor(): void {
+    const file = activeSourceFile();
+
+    if (!file || file === this.boundFile) {
+      return;
+    }
+
+    this.boundFile = file;
+    this.sendSession();
+  }
+
+  private sendSession(): void {
+    this.post({
+      type: "init",
+      state: this.sessions.read(this.boundFile),
+      file: this.boundFile ? path.basename(this.boundFile) : ""
+    });
+  }
+
   private loadState(): WorkspaceState | null {
-    return migrateState(this.context.workspaceState.get(STATE_KEY));
+    return this.sessions.read(this.boundFile);
   }
 
   private async parseUrl(url: string): Promise<void> {
@@ -187,4 +218,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private post(message: unknown): void {
     this.view?.webview.postMessage(message);
   }
+}
+
+/** The active editor's file, when it is something the runner could run. */
+function activeSourceFile(): string | undefined {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.uri.scheme !== "file") {
+    return undefined;
+  }
+  return getLanguage(editor.document.fileName) ? editor.document.fileName : undefined;
 }

@@ -29,7 +29,8 @@
     <section id="panel-runner" class="panel">
         <header class="summary">
             <div class="summary-line">
-                <span id="problem-title" class="problem-title">No problem</span>
+                <span id="active-file" class="active-file"></span>
+                <button id="problem-title" class="problem-title">No problem</button>
                 <span id="problem-meta" class="problem-meta"></span>
                 <span id="run-summary" class="run-summary"></span>
             </div>
@@ -41,15 +42,6 @@
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.7v10.6a.6.6 0 0 0 .92.5l8.2-5.3a.6.6 0 0 0 0-1l-8.2-5.3a.6.6 0 0 0-.92.5Z"/></svg>
             <span id="runBtnLabel">Run</span>
         </button>
-
-        <div id="import-slot" class="import-slot">
-            <input type="text" id="problem-url" class="text-input" placeholder="Paste a problem URL" />
-            <button id="fetchBtn" class="btn btn-primary">Import</button>
-            <button id="btn-cancel-import" class="btn-icon hidden" title="Cancel">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.9 2.1a.5.5 0 0 1 0 .7l-11 11a.5.5 0 0 1-.7-.7l11-11a.5.5 0 0 1 .7 0Z"/><path d="M2.1 2.1a.5.5 0 0 0 0 .7l11 11a.5.5 0 0 0 .7-.7l-11-11a.5.5 0 0 0-.7 0Z"/></svg>
-            </button>
-        </div>
-        <p id="parse-error" class="inline-error hidden"></p>
 
         <div class="runner-pane">
             <div id="runner-error" class="runner-error hidden">
@@ -82,18 +74,25 @@
         </div>
     </section>
 
+    <!-- Importing belongs to the problem, not to the runner: fetching a statement
+         is how a problem arrives, and running is what happens afterwards. -->
     <section id="panel-problem" class="panel hidden">
+        <div id="import-slot" class="import-slot">
+            <input type="text" id="problem-url" class="text-input" placeholder="Paste a Codeforces, AtCoder or NCU Online Judge URL" />
+            <div class="import-actions">
+                <button id="fetchBtn" class="btn btn-primary">Import</button>
+                <button id="btn-cancel-import" class="btn btn-quiet hidden">Cancel</button>
+            </div>
+            <p id="parse-error" class="inline-error hidden"></p>
+        </div>
+
         <div id="statement-body" class="statement-body">
             <div class="statement-heading">
                 <h2 id="statement-title" class="statement-title"></h2>
-                <button id="btn-change-problem" class="btn-quiet hidden">Import another</button>
+                <button id="btn-change-problem" class="btn btn-quiet hidden">Import another</button>
             </div>
             <p id="statement-limits" class="statement-limits"></p>
             <div id="problem-content" class="prose"></div>
-            <div id="statement-empty" class="empty-state">
-                <p>Nothing imported yet.</p>
-                <button id="btn-go-import" class="btn btn-quiet">Import a problem</button>
-            </div>
         </div>
     </section>
 

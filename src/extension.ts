@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { SidebarProvider } from './SidebarProvider';
 import { ProblemFetcher } from './scraper/ProblemFetcher';
+import { StatementCache } from './scraper/StatementCache';
 import { ParsedProblem } from './scraper/types';
 
 /** What the extension exposes to other extensions, and to the packaging check. */
@@ -37,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Asympt
 
         const providers = [cppProvider, pythonProvider, javaProvider];
 
-        const fetcher = new ProblemFetcher(context.globalStorageUri);
+        const fetcher = new ProblemFetcher(context.globalStorageUri, new StatementCache(context.globalState));
         context.subscriptions.push({ dispose: () => { void fetcher.dispose(); } });
 
         const sidebarProvider = new SidebarProvider(context.extensionUri, context, fetcher);
