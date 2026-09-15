@@ -25,7 +25,7 @@ describe('Webview state migration', () => {
         assert.deepStrictEqual(migrated!.testCases, [{ id: 'case-1', input: '8', expected: 'YES' }]);
     });
 
-    it('upgrades a version 2 session, dropping the tabs it was built around', () => {
+    it('upgrades a version 2 session, dropping the chrome it was built around', () => {
         const migrated = migrateState({
             version: 2,
             view: 'workspace',
@@ -42,25 +42,6 @@ describe('Webview state migration', () => {
         assert.strictEqual(migrated!.testCases.length, 1);
     });
 
-    it('defaults the split when a session predates it', () => {
-        const migrated = migrateState({ version: 2, view: 'workspace', testCases: [] });
-
-        assert.strictEqual(migrated!.statementRatio, 45);
-        assert.strictEqual(migrated!.statementCollapsed, false);
-    });
-
-    it('keeps a split the reader chose', () => {
-        const migrated = migrateState({
-            version: STATE_VERSION,
-            statementRatio: 70,
-            statementCollapsed: true,
-            testCases: []
-        });
-
-        assert.strictEqual(migrated!.statementRatio, 70);
-        assert.strictEqual(migrated!.statementCollapsed, true);
-    });
-
     it('drops a version 1 session that never reached the workspace', () => {
         assert.strictEqual(migrateState({ view: 'home', testCases: [] }), null);
     });
@@ -69,8 +50,6 @@ describe('Webview state migration', () => {
         const stored = {
             version: STATE_VERSION,
             mode: 'standard' as const,
-            statementRatio: 45,
-            statementCollapsed: false,
             problem: { title: 'A', timeLimit: '1 second', memoryLimit: '256 MB', html: '<p>a</p>' },
             testCases: [{ id: 'case-1', input: '1', expected: '1' }]
         };

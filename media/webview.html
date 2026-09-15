@@ -3,95 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; img-src ${cspSource} https: data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${cspSource} https: data:;">
     <title>Asymptote</title>
-    <script nonce="${nonce}">
-        window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']]
-            },
-            svg: { fontCache: 'global' }
-        };
-    </script>
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link href="${styleUri}" rel="stylesheet">
 </head>
 <body>
-    <!-- One screen. The statement and the verdicts are both always present, because
-         reading the problem and reading the results are not alternatives. -->
-    <section id="statement-region" class="region statement">
-        <header class="problem-header">
-            <button id="btn-toggle-statement" class="disclosure" aria-expanded="true" title="Collapse">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4z"/></svg>
+    <!-- The runner lives in the panel: wide and short. Everything that describes the
+         run sits on one row, and the cases below it spread across the width. -->
+    <header class="toolbar">
+        <div id="problem-slot" class="problem-slot">
+            <button id="btn-open-statement" class="problem-link" title="Open the statement beside your code">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2H7v12H3.5A1.5 1.5 0 0 1 2 12.5v-9Z"/><path d="M9 2h3.5A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5H9V2Z" opacity="0.55"/></svg>
+                <span id="problem-title">No problem</span>
             </button>
-            <span id="problem-title" class="problem-title">No problem loaded</span>
             <span id="problem-meta" class="problem-meta"></span>
-            <button id="btn-change-problem" class="btn-icon hidden" title="Import another problem">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 6.3 4h-1.2A5.8 5.8 0 1 1 8 2.2V5l4-3.5L8 -2z"/><path d="M8 0l4 3.5L8 7z"/></svg>
-            </button>
-        </header>
-
-        <div id="statement-body" class="statement-body">
-            <div id="import-panel" class="import-panel">
-                <label class="field">
-                    <span class="field-label">Problem URL</span>
-                    <input type="text" id="problem-url" class="text-input" placeholder="Codeforces, AtCoder or NCU Online Judge" />
-                </label>
-                <div class="import-actions">
-                    <button id="fetchBtn" class="btn btn-primary">Import</button>
-                    <button id="btn-manual" class="btn btn-ghost">Start empty</button>
-                </div>
-                <p id="parse-error" class="inline-error hidden"></p>
-            </div>
-            <div id="problem-content" class="prose hidden"></div>
         </div>
-    </section>
 
-    <div id="divider" class="divider" role="separator" aria-orientation="horizontal" tabindex="0" title="Drag to resize"></div>
-
-    <section id="runner-region" class="region runner">
-        <div class="runner-toolbar">
-            <div id="verdict-strip" class="verdict-strip" aria-label="Test case results"></div>
-            <span id="run-summary" class="run-summary"></span>
-            <button id="runBtn" class="btn btn-primary btn-run">Run</button>
+        <div id="import-slot" class="import-slot hidden">
+            <input type="text" id="problem-url" class="text-input" placeholder="Paste a Codeforces, AtCoder or NCU Online Judge URL" />
+            <button id="fetchBtn" class="btn btn-primary">Import</button>
+            <button id="btn-manual" class="btn btn-ghost">Start empty</button>
         </div>
+
+        <div id="verdict-strip" class="verdict-strip" aria-label="Test case results"></div>
+        <span id="run-summary" class="run-summary"></span>
 
         <div class="mode-switch" role="tablist">
-            <button id="mode-standard" class="mode-option active" role="tab">Test Cases</button>
+            <button id="mode-standard" class="mode-option active" role="tab">Cases</button>
             <button id="mode-interactive" class="mode-option" role="tab">Interactive</button>
         </div>
 
-        <div id="standard-runner" class="runner-pane">
-            <div id="runner-error" class="runner-error hidden">
-                <div class="runner-error-header">
-                    <span id="runner-error-title">Compilation failed</span>
-                    <button id="btn-copy-error" class="btn-icon" title="Copy">
-                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
-                    </button>
-                </div>
-                <pre id="runner-error-body"></pre>
-            </div>
+        <button id="runBtn" class="btn btn-primary btn-run">Run</button>
+    </header>
 
-            <div id="test-cases-container" class="stack-tight"></div>
-            <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
-            <button id="btn-add-case" class="btn btn-dashed">+ Add case</button>
+    <p id="parse-error" class="inline-error hidden"></p>
+
+    <main id="standard-runner" class="runner-pane">
+        <div id="runner-error" class="runner-error hidden">
+            <div class="runner-error-header">
+                <span id="runner-error-title">Compilation failed</span>
+                <button id="btn-copy-error" class="btn-icon" title="Copy">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
+                </button>
+            </div>
+            <pre id="runner-error-body"></pre>
         </div>
 
-        <div id="interactive-runner" class="runner-pane interactive hidden">
-            <div class="column-header">
-                <span class="col">Judge (input)</span>
-                <span class="col">Code (output)</span>
-            </div>
-            <div id="chat-history" class="chat-history">
-                <div class="msg-system">Click Start to launch an interactive session.</div>
-            </div>
-            <div class="runner-actions">
-                <button id="interactiveStartBtn" class="btn btn-primary">Start interactive session</button>
-                <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop process</button>
-            </div>
+        <div id="test-cases-container" class="stack-tight"></div>
+        <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
+        <button id="btn-add-case" class="btn btn-dashed">+ Add case</button>
+    </main>
+
+    <main id="interactive-runner" class="runner-pane interactive hidden">
+        <div class="column-header">
+            <span class="col">Judge (input)</span>
+            <span class="col">Code (output)</span>
         </div>
-    </section>
+        <div id="chat-history" class="chat-history">
+            <div class="msg-system">Click Start to launch an interactive session.</div>
+        </div>
+        <div class="runner-actions">
+            <button id="interactiveStartBtn" class="btn btn-primary">Start interactive session</button>
+            <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop process</button>
+        </div>
+    </main>
 
     <script nonce="${nonce}" src="${diffUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>

@@ -24,7 +24,7 @@
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "secondarySidebar": [
+      "panel": [
         {
           "id": "asymptote-view-container",
           "title": "Asymptote",
@@ -37,8 +37,7 @@
         {
           "type": "webview",
           "id": "asymptote-sidebar",
-          "name": "Asymptote Runner",
-          "icon": "media/icon.svg",
+          "name": "Runner",
           "contextualTitle": "Asymptote"
         }
       ]
@@ -50,8 +49,13 @@
       },
       {
         "command": "asymptote.openRunner",
-        "title": "Open Asymptote Runner",
+        "title": "Asymptote: Open Runner",
         "icon": "media/icon.svg"
+      },
+      {
+        "command": "asymptote.openStatement",
+        "title": "Asymptote: Open Problem Statement",
+        "icon": "$(book)"
       },
       {
         "command": "asymptote.toggleCodeLens",
@@ -63,6 +67,12 @@
         {
           "command": "asymptote.openRunner",
           "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "asymptote.openStatement",
+          "when": "true"
         }
       ]
     },

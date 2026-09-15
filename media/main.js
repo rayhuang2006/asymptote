@@ -13,10 +13,7 @@
         hasSession: false,
         mode: 'standard',
         problem: null,
-        cases: [],
-        /** Share of the panel given to the statement, as a percentage. */
-        statementRatio: 45,
-        statementCollapsed: false
+        cases: []
     };
 
     /** Run outcomes live for the session only; they are never persisted. */
@@ -33,9 +30,8 @@
 
     function cacheElements() {
         [
-            'statement-region', 'runner-region', 'divider', 'btn-toggle-statement',
-            'problem-title', 'problem-meta', 'btn-change-problem', 'statement-body',
-            'import-panel', 'problem-content', 'problem-url', 'fetchBtn', 'parse-error',
+            'problem-slot', 'import-slot', 'btn-open-statement',
+            'problem-title', 'problem-meta', 'problem-url', 'fetchBtn', 'parse-error',
             'verdict-strip', 'run-summary', 'runBtn',
             'test-cases-container', 'cases-empty', 'runner-error',
             'runner-error-title', 'runner-error-body', 'standard-runner', 'interactive-runner',
@@ -61,8 +57,6 @@
         return {
             version: STATE_VERSION,
             mode: state.mode,
-            statementRatio: state.statementRatio,
-            statementCollapsed: state.statementCollapsed,
             problem: state.problem,
             testCases: state.cases.map((testCase) => ({
                 id: testCase.id,
@@ -82,8 +76,6 @@
     function applyStoredState(stored) {
         state.hasSession = true;
         state.mode = stored.mode || 'standard';
-        state.statementRatio = typeof stored.statementRatio === 'number' ? stored.statementRatio : 45;
-        state.statementCollapsed = Boolean(stored.statementCollapsed);
         state.problem = stored.problem || null;
         state.cases = (stored.testCases || []).map((testCase) => ({
             id: testCase.id,
@@ -96,19 +88,10 @@
     /* --- rendering --------------------------------------------------------- */
 
     function render() {
-        renderLayout();
         renderProblem();
         renderMode();
         renderCases();
         renderStrip();
-    }
-
-    function renderLayout() {
-        const statement = els['statement-region'];
-        statement.classList.toggle('collapsed', state.statementCollapsed);
-        statement.style.maxHeight = state.statementCollapsed ? '' : `${state.statementRatio}%`;
-        els['btn-toggle-statement'].setAttribute('aria-expanded', String(!state.statementCollapsed));
-        toggle(els['divider'], state.statementCollapsed);
     }
 
     function toggle(element, hidden) {
@@ -119,28 +102,16 @@
 
     function renderProblem() {
         const problem = state.problem;
+        const named = Boolean(problem && problem.title);
 
-        els['problem-title'].textContent = problem && problem.title ? problem.title : 'No problem loaded';
-        els['problem-title'].classList.toggle('placeholder', !(problem && problem.title));
+        els['problem-title'].textContent = named ? problem.title : 'No problem';
+        els['btn-open-statement'].classList.toggle('placeholder', !named);
+        els['btn-open-statement'].disabled = !named;
         els['problem-meta'].textContent = formatLimits(problem);
-        toggle(els['btn-change-problem'], !problem);
 
-        toggle(els['import-panel'], Boolean(problem));
-        toggle(els['problem-content'], !problem);
-
-        if (!problem) {
-            els['problem-content'].innerHTML = '';
-            return;
-        }
-
-        if (els['problem-content'].dataset.rendered !== problem.html) {
-            els['problem-content'].innerHTML = problem.html;
-            els['problem-content'].dataset.rendered = problem.html;
-
-            if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
-            }
-        }
+        // With nothing imported the toolbar offers the URL box instead of a title.
+        toggle(els['problem-slot'], !problem);
+        toggle(els['import-slot'], Boolean(problem));
     }
 
     /** One segment per case, so a whole run reads at a glance. */
@@ -257,13 +228,19 @@
                 '</div>' +
             '</div>' +
             '<div class="case-body">' +
-                '<span class="label">Input</span><textarea class="input-box" rows="2"></textarea>' +
-                '<span class="label">Expected</span><textarea class="expected-box" rows="2"></textarea>' +
-                '<div class="case-output">' +
+                '<div class="case-column">' +
+                    '<span class="label">Input</span>' +
+                    '<textarea class="input-box" rows="2"></textarea>' +
+                '</div>' +
+                '<div class="case-column">' +
+                    '<span class="label">Expected</span>' +
+                    '<textarea class="expected-box" rows="2"></textarea>' +
+                '</div>' +
+                '<div class="case-column case-output">' +
                     '<span class="label">Actual</span>' +
                     '<textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>' +
                 '</div>' +
-                '<div class="case-diff hidden"></div>' +
+                '<div class="case-column case-diff hidden"></div>' +
             '</div>';
 
         const inputBox = node.querySelector('.input-box');
@@ -552,11 +529,10 @@
         els['fetchBtn'].textContent = isFetching ? 'Importing...' : 'Import';
     }
 
-    /** Puts the import form back, keeping the cases that are already there. */
+    /** Puts the import box back, keeping the cases that are already there. */
     function showImport() {
         state.problem = null;
         toggle(els['parse-error'], true);
-        state.statementCollapsed = false;
         render();
         persist();
         els['problem-url'].focus();
@@ -586,46 +562,6 @@
         requestAnimationFrame(() => {
             document.querySelectorAll('#standard-runner textarea').forEach(autoResize);
         });
-    }
-
-    function toggleStatement() {
-        state.statementCollapsed = !state.statementCollapsed;
-        render();
-        persist();
-    }
-
-    /* --- divider ------------------------------------------------------------ */
-
-    const MIN_RATIO = 12;
-    const MAX_RATIO = 85;
-
-    function startDrag(event) {
-        event.preventDefault();
-        els['divider'].classList.add('dragging');
-        els['divider'].setPointerCapture(event.pointerId);
-
-        const move = (moved) => {
-            const bounds = document.body.getBoundingClientRect();
-            const ratio = ((moved.clientY - bounds.top) / bounds.height) * 100;
-            state.statementRatio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio));
-            renderLayout();
-        };
-
-        const stop = () => {
-            els['divider'].classList.remove('dragging');
-            els['divider'].removeEventListener('pointermove', move);
-            els['divider'].removeEventListener('pointerup', stop);
-            persist();
-        };
-
-        els['divider'].addEventListener('pointermove', move);
-        els['divider'].addEventListener('pointerup', stop);
-    }
-
-    function nudgeDivider(delta) {
-        state.statementRatio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, state.statementRatio + delta));
-        renderLayout();
-        persist();
     }
 
     function setMode(mode) {
@@ -810,14 +746,8 @@
                 startParsing();
             }
         });
-        byId('btn-change-problem').addEventListener('click', showImport);
-        byId('btn-toggle-statement').addEventListener('click', toggleStatement);
-        byId('problem-title').addEventListener('click', toggleStatement);
-
-        byId('divider').addEventListener('pointerdown', startDrag);
-        byId('divider').addEventListener('keydown', (event) => {
-            if (event.key === 'ArrowUp') { nudgeDivider(-5); }
-            if (event.key === 'ArrowDown') { nudgeDivider(5); }
+        byId('btn-open-statement').addEventListener('click', () => {
+            vscode.postMessage({ command: 'open-statement' });
         });
 
         byId('mode-standard').addEventListener('click', () => setMode('standard'));

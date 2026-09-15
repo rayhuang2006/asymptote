@@ -16,20 +16,15 @@ export interface StoredTestCase {
 export interface WorkspaceState {
     version: number;
     mode: "standard" | "interactive";
-    /** Share of the panel given to the statement, as a percentage. */
-    statementRatio: number;
-    statementCollapsed: boolean;
     problem: StoredProblem | null;
     testCases: StoredTestCase[];
 }
 
-const DEFAULT_RATIO = 45;
-
 /**
  * Version 1 stored the rendered problem markup and read the test cases straight out of
- * the DOM. Version 2 added a home screen and a pair of tabs, both of which the panel no
- * longer has. Everything persisted by either is upgraded here so a workspace keeps its
- * cases across the change.
+ * the DOM. Version 2 added a home screen and a pair of tabs, neither of which exists now
+ * that the runner is a panel and the statement is an editor tab. Everything persisted by
+ * either is upgraded here so a workspace keeps its cases across the change.
  */
 export function migrateState(raw: unknown): WorkspaceState | null {
     if (!raw || typeof raw !== "object") {
@@ -64,13 +59,9 @@ function normalize(candidate: Record<string, any>): WorkspaceState {
         }))
         : [];
 
-    const ratio = Number(candidate.statementRatio);
-
     return {
         version: STATE_VERSION,
         mode: candidate.mode === "interactive" ? "interactive" : "standard",
-        statementRatio: Number.isFinite(ratio) && ratio > 0 ? ratio : DEFAULT_RATIO,
-        statementCollapsed: Boolean(candidate.statementCollapsed),
         problem: candidate.problem?.html
             ? {
                 title: candidate.problem.title ?? "",

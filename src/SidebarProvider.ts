@@ -6,6 +6,7 @@ import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
 import { resolveTimeLimit } from "./runner/timeLimit";
 import { getWebviewHtml } from "./webview/WebviewHtml";
 import { WorkspaceState, migrateState } from "./webview/WorkspaceState";
+import { StatementPanel } from "./webview/StatementPanel";
 
 const STATE_KEY = "asymptote-state";
 
@@ -58,6 +59,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       case "save-state":
         await this.context.workspaceState.update(STATE_KEY, message.state);
         break;
+      case "open-statement":
+        this.openStatement();
+        break;
       case "copy":
         await vscode.env.clipboard.writeText(message.text ?? "");
         break;
@@ -71,21 +75,35 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     return migrateState(this.context.workspaceState.get(STATE_KEY));
   }
 
+  /** Opens the statement of whichever problem the panel is currently showing. */
+  public openStatement(): void {
+    const problem = this.loadState()?.problem;
+
+    if (!problem) {
+      vscode.window.showInformationMessage("Import a problem first, then open its statement.");
+      return;
+    }
+
+    StatementPanel.show(this.extensionUri, problem);
+  }
+
   private async parseUrl(url: string): Promise<void> {
     this.post({ type: "status", scope: "fetch", value: "loading" });
 
     try {
       const problem = await this.fetcher.fetch(url);
-      this.post({
-        type: "problem-loaded",
-        problem: {
-          title: problem.title,
-          timeLimit: problem.timeLimit,
-          memoryLimit: problem.memoryLimit,
-          html: problem.htmlContent
-        },
-        testCases: problem.testCases
-      });
+      const stored = {
+        title: problem.title,
+        timeLimit: problem.timeLimit,
+        memoryLimit: problem.memoryLimit,
+        html: problem.htmlContent
+      };
+
+      this.post({ type: "problem-loaded", problem: stored, testCases: problem.testCases });
+
+      // Importing is the moment the statement is wanted; after that it is the
+      // reader's business whether the tab stays open.
+      StatementPanel.show(this.extensionUri, stored);
     } catch (error: any) {
       const reason = error?.message ?? String(error);
       this.post({ type: "status", scope: "fetch", value: "error", message: reason });
