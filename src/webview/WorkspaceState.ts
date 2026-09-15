@@ -1,6 +1,8 @@
 export const STATE_VERSION = 3;
 
 export interface StoredProblem {
+    /** Where it was imported from, which is what makes a re-import recognisable. */
+    url?: string;
     title: string;
     timeLimit: string;
     memoryLimit: string;
@@ -51,6 +53,18 @@ export function migrateState(raw: unknown): WorkspaceState | null {
     });
 }
 
+/** A session stored before problems remembered their address has no url to keep. */
+function readProblem(problem: Record<string, any>): StoredProblem {
+    const stored: StoredProblem = {
+        title: problem.title ?? "",
+        timeLimit: problem.timeLimit ?? "",
+        memoryLimit: problem.memoryLimit ?? "",
+        html: problem.html
+    };
+
+    return problem.url ? { ...stored, url: problem.url } : stored;
+}
+
 /** A version 1 session recorded interactive as a flag rather than a tab. */
 function readTab(candidate: Record<string, any>): WorkspaceState["tab"] {
     const tab = candidate.mode === "interactive" ? "interactive" : candidate.tab;
@@ -69,14 +83,7 @@ function normalize(candidate: Record<string, any>): WorkspaceState {
     return {
         version: STATE_VERSION,
         tab: readTab(candidate),
-        problem: candidate.problem?.html
-            ? {
-                title: candidate.problem.title ?? "",
-                timeLimit: candidate.problem.timeLimit ?? "",
-                memoryLimit: candidate.problem.memoryLimit ?? "",
-                html: candidate.problem.html
-            }
-            : null,
+        problem: candidate.problem?.html ? readProblem(candidate.problem) : null,
         testCases
     };
 }

@@ -20,21 +20,54 @@ const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
  * this browser, including a clearance cookie earned once, survives a restart of
  * the editor instead of being thrown away after every fetch.
  */
+/** A site asked this browser to prove it is not a robot. */
+export class ChallengeError extends Error {
+    constructor(host: string) {
+        super(`${host} asked this browser to verify itself and would not serve the page.`);
+        this.name = "ChallengeError";
+    }
+}
+
 export class BrowserSession {
     private browser: any;
     private launching?: Promise<any>;
     private idleTimer?: NodeJS.Timeout;
+    /** Set when the profile could not be used and a throwaway one is standing in. */
+    private throwawayProfile?: string;
 
     constructor(private readonly profileRoot: vscode.Uri) {}
 
+    /**
+     * A profile builds up a reputation with the sites it visits, which is the point
+     * of keeping one. It can also acquire a bad one, and then every request is
+     * answered with a challenge. A challenge is therefore worth one retry from a
+     * clean profile, and the spoiled one is discarded rather than kept.
+     */
     public async loadHtml(url: string, readySelector?: string): Promise<string> {
+        try {
+            return await this.attempt(url, readySelector);
+        } catch (error) {
+            if (!(error instanceof ChallengeError)) {
+                throw error;
+            }
+
+            await this.discardProfile();
+            return this.attempt(url, readySelector);
+        }
+    }
+
+    private async attempt(url: string, readySelector?: string): Promise<string> {
         const browser = await this.getBrowser();
         const page = await browser.newPage();
 
         try {
             await page.setUserAgent(USER_AGENT);
             await page.setViewport({ width: 1440, height: 900 });
-            await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
+            const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
+
+            if (isChallenge(response, await page.content())) {
+                throw new ChallengeError(new URL(url).hostname);
+            }
 
             if (readySelector) {
                 await page.waitForSelector(readySelector, { timeout: READY_TIMEOUT_MS });
@@ -45,6 +78,17 @@ export class BrowserSession {
             await page.close().catch(() => undefined);
             this.scheduleShutdown();
         }
+    }
+
+    /** Throws away the profile a site has taken against, so the next launch is clean. */
+    private async discardProfile(): Promise<void> {
+        const directory = this.profileDirectory();
+        await this.dispose();
+
+        if (!this.throwawayProfile) {
+            fs.rmSync(directory, { recursive: true, force: true });
+        }
+        this.throwawayProfile = undefined;
     }
 
     public async dispose(): Promise<void> {
@@ -75,15 +119,34 @@ export class BrowserSession {
 
     private async launch(): Promise<any> {
         const executablePath = await resolveBrowserPath();
-        const userDataDir = path.join(this.profileRoot.fsPath, "browser-profile");
+        const userDataDir = this.profileDirectory();
         fs.mkdirSync(userDataDir, { recursive: true });
 
+        try {
+            return await this.launchWith(executablePath, userDataDir);
+        } catch (error: any) {
+            // A profile belongs to one browser at a time, and another window or a
+            // browser left behind by a previous session may still hold it.
+            if (!/already running/i.test(String(error?.message))) {
+                throw error;
+            }
+
+            this.throwawayProfile = fs.mkdtempSync(path.join(os.tmpdir(), "asymptote-browser-"));
+            return this.launchWith(executablePath, this.throwawayProfile);
+        }
+    }
+
+    private launchWith(executablePath: string, userDataDir: string): Promise<any> {
         return puppeteer.launch({
             headless: true,
             executablePath,
             userDataDir,
             args: ["--no-sandbox", "--disable-setuid-sandbox"]
         });
+    }
+
+    private profileDirectory(): string {
+        return this.throwawayProfile ?? path.join(this.profileRoot.fsPath, "browser-profile");
     }
 
     private scheduleShutdown(): void {
@@ -99,6 +162,19 @@ export class BrowserSession {
             this.idleTimer = undefined;
         }
     }
+}
+
+/**
+ * Cloudflare says so in a header, and says it again in the markup it serves. The
+ * page itself is localised, so its words are no use for recognising it.
+ */
+function isChallenge(response: any, html: string): boolean {
+    if (response?.headers?.()["cf-mitigated"] === "challenge") {
+        return true;
+    }
+
+    return response?.status?.() === 403 &&
+        (html.includes("cdn-cgi/challenge-platform") || html.includes("__cf_chl"));
 }
 
 async function resolveBrowserPath(): Promise<string> {

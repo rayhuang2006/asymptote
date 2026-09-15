@@ -12,7 +12,6 @@
     const TABS = ['runner', 'interactive', 'problem'];
 
     const state = {
-        hasSession: false,
         /** The runner opens first: it works without importing anything. */
         tab: 'runner',
         problem: null,
@@ -38,9 +37,10 @@
         [
             'tab-runner', 'tab-interactive', 'tab-problem',
             'panel-runner', 'panel-interactive', 'panel-problem',
-            'statement-title', 'statement-limits', 'statement-empty', 'problem-content',
+            'statement-title', 'statement-limits', 'problem-content',
             'import-slot', 'btn-cancel-import', 'btn-change-problem',
-            'problem-title', 'problem-meta', 'problem-url', 'fetchBtn',
+            'statement-body', 'active-file', 'problem-title', 'problem-meta',
+            'problem-url', 'fetchBtn',
             'parse-error', 'verdict-strip', 'run-summary', 'runBtn', 'runBtnLabel',
             'test-cases-container', 'cases-empty', 'runner-error',
             'runner-error-title', 'runner-error-body', 'chat-history',
@@ -59,7 +59,9 @@
     }
 
     function serializeState() {
-        if (!state.hasSession) {
+        // A file earns a stored session by having something in it. An empty one is
+        // removed rather than saved, so a file the reader never used stays clean.
+        if (!state.problem && state.cases.length === 0) {
             return null;
         }
         return {
@@ -82,10 +84,9 @@
     }
 
     function applyStoredState(stored) {
-        state.hasSession = true;
-        state.tab = TABS.indexOf(stored.tab) >= 0 ? stored.tab : 'runner';
-        state.problem = stored.problem || null;
-        state.cases = (stored.testCases || []).map((testCase) => ({
+        state.tab = stored && TABS.indexOf(stored.tab) >= 0 ? stored.tab : 'runner';
+        state.problem = (stored && stored.problem) || null;
+        state.cases = ((stored && stored.testCases) || []).map((testCase) => ({
             id: testCase.id,
             input: testCase.input,
             expected: testCase.expected
@@ -136,9 +137,11 @@
         els['problem-meta'].textContent = formatLimits(problem);
 
         // The URL box is always there when nothing is imported, and on demand after.
-        toggle(els['import-slot'], Boolean(problem) && !importing);
-        toggle(els['btn-cancel-import'], !problem);
-        toggle(els['btn-change-problem'], !problem);
+        const showImportBox = !problem || importing;
+        toggle(els['import-slot'], !showImportBox);
+        toggle(els['statement-body'], !problem);
+        toggle(els['btn-cancel-import'], !(problem && importing));
+        toggle(els['btn-change-problem'], !problem || importing);
 
         renderStatement(problem);
     }
@@ -147,8 +150,6 @@
     function renderStatement(problem) {
         els['statement-title'].textContent = problem && problem.title ? problem.title : '';
         els['statement-limits'].textContent = formatLimits(problem);
-        toggle(els['statement-empty'], Boolean(problem));
-        toggle(els['problem-content'], !problem);
 
         if (!problem) {
             els['problem-content'].innerHTML = '';
@@ -573,7 +574,7 @@
     /** Reveals the URL box without discarding what is already loaded. */
     function showImport() {
         importing = true;
-        setTab('runner');
+        setTab('problem');
         toggle(els['parse-error'], true);
         render();
         els['problem-url'].focus();
@@ -598,7 +599,6 @@
 
     function openProblem(problem, testCases) {
         importing = false;
-        state.hasSession = true;
         state.problem = problem;
         state.cases = (testCases && testCases.length > 0)
             ? testCases.map((testCase) => createCase(testCase.input, testCase.expected))
@@ -718,10 +718,16 @@
 
     const handlers = {
         'init': (msg) => {
-            if (msg.state) {
-                applyStoredState(msg.state);
-            }
+            // The panel follows the editor, so an init can arrive at any time with
+            // a different file's session.
+            importing = false;
+            results.clear();
+            els['active-file'].textContent = msg.file || '';
+            applyStoredState(msg.state);
             render();
+            requestAnimationFrame(() => {
+                document.querySelectorAll('#panel-runner textarea').forEach(autoResize);
+            });
         },
         'problem-loaded': (msg) => {
             setFetching(false);
@@ -794,7 +800,7 @@
             }
         });
         TABS.forEach((tab) => byId(`tab-${tab}`).addEventListener('click', () => setTab(tab)));
-        byId('btn-go-import').addEventListener('click', showImport);
+        byId('problem-title').addEventListener('click', () => setTab('problem'));
         byId('btn-change-problem').addEventListener('click', showImport);
         byId('btn-cancel-import').addEventListener('click', cancelImport);
         byId('problem-url').addEventListener('keydown', (event) => {

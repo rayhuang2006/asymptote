@@ -39,9 +39,26 @@ function stageInstalledLayout() {
     return path.join(staged, 'unpacked', 'extension');
 }
 
+/**
+ * Stands in for the editor API. Members the extension reaches for but this stub does
+ * not define resolve to a disposable-returning no-op and are reported, because the
+ * point of this check is whether the bundle loads, not whether the stub is complete.
+ */
+function autoStub(name, defined) {
+    return new Proxy(defined, {
+        get(target, key) {
+            if (key in target || typeof key === 'symbol') {
+                return target[key];
+            }
+            console.log(`  stubbed ${name}.${String(key)}`);
+            return () => ({ dispose() {} });
+        }
+    });
+}
+
 function stubEditor() {
     const noop = () => ({ dispose() {} });
-    return {
+    const editor = {
         Uri: {
             file: (value) => ({ fsPath: value, path: value }),
             joinPath: (base, ...parts) => ({ fsPath: path.join(base.fsPath, ...parts) })
@@ -64,6 +81,12 @@ function stubEditor() {
         },
         env: { clipboard: { writeText: async () => {} } }
     };
+
+    ['window', 'workspace', 'commands', 'languages', 'env'].forEach((area) => {
+        editor[area] = autoStub(area, editor[area]);
+    });
+
+    return editor;
 }
 
 async function main() {
