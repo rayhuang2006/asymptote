@@ -185,10 +185,29 @@ body {
 .toolbar {
     flex: none;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2) var(--sp-3);
     padding: var(--sp-2) var(--sp-3);
     border-bottom: 1px solid var(--asym-border);
+}
+
+/* In a sidebar the row cannot hold everything, so the strip takes its own line
+   and the controls sit under the problem it describes. */
+.verdict-strip {
+    order: 3;
+}
+
+.run-summary {
+    order: 4;
+}
+
+.mode-switch {
+    order: 5;
+}
+
+.btn-run {
+    order: 6;
 }
 
 .problem-slot {
@@ -196,7 +215,7 @@ body {
     align-items: baseline;
     gap: var(--sp-2);
     min-width: 0;
-    max-width: 40%;
+    flex: 1 1 12rem;
 }
 
 .problem-link {
@@ -262,11 +281,11 @@ body {
 
 /* One segment per case: the whole run is legible without scrolling. */
 .verdict-strip {
-    flex: 1;
+    flex: 1 1 6rem;
     display: flex;
     align-items: center;
     gap: 3px;
-    min-width: 40px;
+    min-width: 3rem;
 }
 
 .verdict {

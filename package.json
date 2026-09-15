@@ -24,7 +24,7 @@
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "panel": [
+      "secondarySidebar": [
         {
           "id": "asymptote-view-container",
           "title": "Asymptote",
@@ -38,6 +38,7 @@
           "type": "webview",
           "id": "asymptote-sidebar",
           "name": "Runner",
+          "icon": "media/icon.svg",
           "contextualTitle": "Asymptote"
         }
       ]
