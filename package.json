@@ -54,11 +54,6 @@
         "icon": "media/icon.svg"
       },
       {
-        "command": "asymptote.openStatement",
-        "title": "Asymptote: Open Problem Statement",
-        "icon": "$(book)"
-      },
-      {
         "command": "asymptote.toggleCodeLens",
         "title": "Asymptote: Toggle Complexity Lens"
       }
@@ -68,12 +63,6 @@
         {
           "command": "asymptote.openRunner",
           "group": "navigation"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "asymptote.openStatement",
-          "when": "true"
         }
       ]
     },

@@ -6,7 +6,6 @@ import { SUPPORTED_EXTENSIONS, getLanguage } from "./runner/ExecutionStrategy";
 import { resolveTimeLimit } from "./runner/timeLimit";
 import { getWebviewHtml } from "./webview/WebviewHtml";
 import { WorkspaceState, migrateState } from "./webview/WorkspaceState";
-import { StatementPanel } from "./webview/StatementPanel";
 
 const STATE_KEY = "asymptote-state";
 
@@ -59,9 +58,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       case "save-state":
         await this.context.workspaceState.update(STATE_KEY, message.state);
         break;
-      case "open-statement":
-        this.openStatement();
-        break;
       case "copy":
         await vscode.env.clipboard.writeText(message.text ?? "");
         break;
@@ -73,18 +69,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private loadState(): WorkspaceState | null {
     return migrateState(this.context.workspaceState.get(STATE_KEY));
-  }
-
-  /** Opens the statement of whichever problem the panel is currently showing. */
-  public openStatement(): void {
-    const problem = this.loadState()?.problem;
-
-    if (!problem) {
-      vscode.window.showInformationMessage("Import a problem first, then open its statement.");
-      return;
-    }
-
-    StatementPanel.show(this.extensionUri, problem);
   }
 
   private async parseUrl(url: string): Promise<void> {
@@ -100,11 +84,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       };
 
       this.post({ type: "problem-loaded", problem: stored, testCases: problem.testCases });
-
-      // Importing does not open the statement: the runner is what the panel is for,
-      // and reading the problem is a click away. An already open statement is kept
-      // current rather than left showing the previous problem.
-      StatementPanel.refresh(stored);
     } catch (error: any) {
       const reason = error?.message ?? String(error);
       this.post({ type: "status", scope: "fetch", value: "error", message: reason });

@@ -53,10 +53,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Asympt
             vscode.commands.executeCommand('asymptote-sidebar.focus');
         }));
 
-        context.subscriptions.push(vscode.commands.registerCommand('asymptote.openStatement', () => {
-            sidebarProvider.openStatement();
-        }));
-
         context.subscriptions.push(vscode.commands.registerCommand('asymptote.toggleCodeLens', async () => {
             const config = vscode.workspace.getConfiguration('asymptote');
             const currentValue = config.get<boolean>('enableCodeLens');

@@ -16,6 +16,7 @@ export interface StoredTestCase {
 export interface WorkspaceState {
     version: number;
     mode: "standard" | "interactive";
+    tab: "runner" | "problem";
     problem: StoredProblem | null;
     testCases: StoredTestCase[];
 }
@@ -62,6 +63,7 @@ function normalize(candidate: Record<string, any>): WorkspaceState {
     return {
         version: STATE_VERSION,
         mode: candidate.mode === "interactive" ? "interactive" : "standard",
+        tab: candidate.tab === "problem" ? "problem" : "runner",
         problem: candidate.problem?.html
             ? {
                 title: candidate.problem.title ?? "",

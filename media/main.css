@@ -176,6 +176,78 @@ body {
     fill: currentColor;
 }
 
+/* --- Tabs and panels ------------------------------------------------------ */
+
+.tabs {
+    flex: none;
+    display: flex;
+    border-bottom: 1px solid var(--asym-border);
+}
+
+.tab {
+    flex: 1;
+    padding: var(--sp-2) 0;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--asym-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.tab:hover {
+    color: var(--asym-fg);
+    background-color: var(--asym-hover);
+}
+
+.tab.active {
+    color: var(--vscode-panelTitle-activeForeground, var(--asym-fg));
+    border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--asym-accent));
+}
+
+.panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Statement ------------------------------------------------------------ */
+
+.statement-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--sp-3);
+}
+
+.statement-title {
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-xl);
+    font-weight: 600;
+}
+
+.statement-title:empty {
+    display: none;
+}
+
+.statement-limits {
+    margin: 0 0 var(--sp-3);
+    padding-bottom: var(--sp-2);
+    font-size: var(--fs-sm);
+    color: var(--asym-muted);
+    border-bottom: 1px solid var(--asym-border);
+}
+
+.statement-limits:empty {
+    display: none;
+}
+
 /* --- Toolbar -------------------------------------------------------------- */
 
 body {

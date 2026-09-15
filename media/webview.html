@@ -3,16 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${cspSource} https: data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; img-src ${cspSource} https: data:;">
     <title>Asymptote</title>
+    <script nonce="${nonce}">
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link href="${styleUri}" rel="stylesheet">
 </head>
 <body>
-    <!-- The runner lives in the panel: wide and short. Everything that describes the
-         run sits on one row, and the cases below it spread across the width. -->
+    <!-- Two tabs, no home screen. The runner is what opens, because a fresh panel
+         takes typed test cases without importing anything; the statement is a click
+         away and has something in it once a problem has been fetched. -->
+    <nav class="tabs" role="tablist">
+        <button id="tab-runner" class="tab active" role="tab">Runner</button>
+        <button id="tab-problem" class="tab" role="tab">Problem</button>
+    </nav>
+
+    <section id="panel-runner" class="panel">
     <header class="toolbar">
         <div id="problem-slot" class="problem-slot">
-            <button id="btn-open-statement" class="problem-link" title="Open the statement beside your code">
+            <button id="btn-open-statement" class="problem-link" title="Read the statement">
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2H7v12H3.5A1.5 1.5 0 0 1 2 12.5v-9Z"/><path d="M9 2h3.5A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5H9V2Z" opacity="0.55"/></svg>
                 <span id="problem-title">No problem</span>
             </button>
@@ -67,6 +84,20 @@
             <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop process</button>
         </div>
     </main>
+
+    </section>
+
+    <section id="panel-problem" class="panel hidden">
+        <div id="statement-body" class="statement-body">
+            <h2 id="statement-title" class="statement-title"></h2>
+            <p id="statement-limits" class="statement-limits"></p>
+            <div id="problem-content" class="prose"></div>
+            <div id="statement-empty" class="empty-state">
+                <p>Nothing imported yet.</p>
+                <button id="btn-go-import" class="btn btn-ghost">Import a problem</button>
+            </div>
+        </div>
+    </section>
 
     <script nonce="${nonce}" src="${diffUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>

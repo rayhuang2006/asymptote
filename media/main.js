@@ -12,6 +12,8 @@
     const state = {
         hasSession: false,
         mode: 'standard',
+        /** The runner opens first: it works without importing anything. */
+        tab: 'runner',
         problem: null,
         cases: []
     };
@@ -30,6 +32,8 @@
 
     function cacheElements() {
         [
+            'tab-runner', 'tab-problem', 'panel-runner', 'panel-problem',
+            'statement-title', 'statement-limits', 'statement-empty', 'problem-content',
             'problem-slot', 'import-slot', 'btn-open-statement',
             'problem-title', 'problem-meta', 'problem-url', 'fetchBtn', 'parse-error',
             'verdict-strip', 'run-summary', 'runBtn',
@@ -57,6 +61,7 @@
         return {
             version: STATE_VERSION,
             mode: state.mode,
+            tab: state.tab,
             problem: state.problem,
             testCases: state.cases.map((testCase) => ({
                 id: testCase.id,
@@ -76,6 +81,7 @@
     function applyStoredState(stored) {
         state.hasSession = true;
         state.mode = stored.mode || 'standard';
+        state.tab = stored.tab === 'problem' ? 'problem' : 'runner';
         state.problem = stored.problem || null;
         state.cases = (stored.testCases || []).map((testCase) => ({
             id: testCase.id,
@@ -88,10 +94,31 @@
     /* --- rendering --------------------------------------------------------- */
 
     function render() {
+        renderTabs();
         renderProblem();
         renderMode();
         renderCases();
         renderStrip();
+    }
+
+    function renderTabs() {
+        const onProblem = state.tab === 'problem';
+        els['tab-runner'].classList.toggle('active', !onProblem);
+        els['tab-problem'].classList.toggle('active', onProblem);
+        toggle(els['panel-runner'], onProblem);
+        toggle(els['panel-problem'], !onProblem);
+    }
+
+    function setTab(tab) {
+        state.tab = tab;
+        render();
+        persist();
+
+        if (tab === 'runner') {
+            requestAnimationFrame(() => {
+                document.querySelectorAll('#panel-runner textarea').forEach(autoResize);
+            });
+        }
     }
 
     function toggle(element, hidden) {
@@ -112,6 +139,31 @@
         // With nothing imported the toolbar offers the URL box instead of a title.
         toggle(els['problem-slot'], !problem);
         toggle(els['import-slot'], Boolean(problem));
+
+        renderStatement(problem);
+    }
+
+    /** The statement has something in it only once a problem has been fetched. */
+    function renderStatement(problem) {
+        els['statement-title'].textContent = problem && problem.title ? problem.title : '';
+        els['statement-limits'].textContent = formatLimits(problem);
+        toggle(els['statement-empty'], Boolean(problem));
+        toggle(els['problem-content'], !problem);
+
+        if (!problem) {
+            els['problem-content'].innerHTML = '';
+            els['problem-content'].dataset.rendered = '';
+            return;
+        }
+
+        if (els['problem-content'].dataset.rendered !== problem.html) {
+            els['problem-content'].innerHTML = problem.html;
+            els['problem-content'].dataset.rendered = problem.html;
+
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
+            }
+        }
     }
 
     /** One segment per case, so a whole run reads at a glance. */
@@ -746,8 +798,12 @@
                 startParsing();
             }
         });
-        byId('btn-open-statement').addEventListener('click', () => {
-            vscode.postMessage({ command: 'open-statement' });
+        byId('tab-runner').addEventListener('click', () => setTab('runner'));
+        byId('tab-problem').addEventListener('click', () => setTab('problem'));
+        byId('btn-open-statement').addEventListener('click', () => setTab('problem'));
+        byId('btn-go-import').addEventListener('click', () => {
+            setTab('runner');
+            els['problem-url'].focus();
         });
 
         byId('mode-standard').addEventListener('click', () => setMode('standard'));

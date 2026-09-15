@@ -22,8 +22,6 @@ export function getWebviewHtml(
         styleUri: asset(webview, extensionUri, "main.css"),
         scriptUri: asset(webview, extensionUri, "main.js"),
         diffUri: asset(webview, extensionUri, "diff.js"),
-        statementStyleUri: asset(webview, extensionUri, "statement.css"),
-        statementScriptUri: asset(webview, extensionUri, "statement.js"),
         ...extra
     };
 
