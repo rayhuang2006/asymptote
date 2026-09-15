@@ -767,12 +767,18 @@ textarea[readonly] {
     white-space: pre;
 }
 
-.diff-line.removed {
+.diff-line.expected {
+    color: var(--asym-fg);
+}
+
+/* Everything tinted is something wrong with the output, which is the only thing
+   the reader is looking for. */
+.diff-line.wrong {
     background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.16));
 }
 
-.diff-line.added {
-    background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(63, 185, 80, 0.16));
+.diff-line.same {
+    color: var(--asym-muted);
 }
 
 .diff-gutter {
@@ -784,20 +790,19 @@ textarea[readonly] {
     user-select: none;
 }
 
-.diff-sign {
+.diff-side {
     flex: none;
-    width: 1.2em;
+    width: 5.5em;
+    padding-right: var(--sp-2);
+    font-family: var(--vscode-font-family);
+    font-size: var(--fs-xs);
     color: var(--asym-muted);
-    text-align: center;
+    text-align: right;
     user-select: none;
 }
 
-.diff-line.removed .diff-sign {
+.diff-line.wrong .diff-side {
     color: var(--asym-fail);
-}
-
-.diff-line.added .diff-sign {
-    color: var(--asym-pass);
 }
 
 .diff-whitespace {

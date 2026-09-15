@@ -417,22 +417,27 @@
 
     function appendDiffRows(table, row) {
         if (row.type === 'same') {
-            table.appendChild(buildDiffRow('same', row.expectedLine, ' ', row.expected));
+            table.appendChild(buildDiffRow('same', row.expectedLine, '', row.expected));
             return;
         }
         if (row.type === 'changed') {
-            table.appendChild(buildDiffRow('removed', row.expectedLine, '-', row.expected));
-            table.appendChild(buildDiffRow('added', row.actualLine, '+', row.actual));
+            table.appendChild(buildDiffRow('expected', row.expectedLine, 'expected', row.expected));
+            table.appendChild(buildDiffRow('wrong', row.actualLine, 'got', row.actual));
             return;
         }
         if (row.type === 'missing') {
-            table.appendChild(buildDiffRow('removed', row.expectedLine, '-', row.expected));
+            table.appendChild(buildDiffRow('expected', row.expectedLine, 'expected', row.expected));
+            table.appendChild(buildDiffRow('wrong', null, 'missing', ''));
             return;
         }
-        table.appendChild(buildDiffRow('added', row.actualLine, '+', row.actual));
+        table.appendChild(buildDiffRow('wrong', row.actualLine, 'extra', row.actual));
     }
 
-    function buildDiffRow(kind, lineNumber, marker, text) {
+    /**
+     * The sides are named rather than marked. A plus and a minus cannot be told
+     * apart from the sign of a number, and competitive output is full of negatives.
+     */
+    function buildDiffRow(kind, lineNumber, label, text) {
         const line = document.createElement('div');
         line.className = 'diff-line ' + kind;
 
@@ -440,16 +445,16 @@
         gutter.className = 'diff-gutter';
         gutter.textContent = lineNumber === null ? '' : String(lineNumber);
 
-        const sign = document.createElement('span');
-        sign.className = 'diff-sign';
-        sign.textContent = marker;
+        const side = document.createElement('span');
+        side.className = 'diff-side';
+        side.textContent = label;
 
         const content = document.createElement('span');
         content.className = 'diff-text';
         appendTextWithVisibleSpaces(content, text);
 
         line.appendChild(gutter);
-        line.appendChild(sign);
+        line.appendChild(side);
         line.appendChild(content);
         return line;
     }
