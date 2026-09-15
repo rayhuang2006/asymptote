@@ -1,4 +1,4 @@
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export interface StoredProblem {
     title: string;
@@ -15,16 +15,17 @@ export interface StoredTestCase {
 
 export interface WorkspaceState {
     version: number;
-    view: "home" | "workspace";
-    tab: "problem" | "runner";
-    mode: "standard" | "interactive";
+    /** Interactive is a tab of its own now, so the mode it used to be is gone. */
+    tab: "runner" | "interactive" | "problem";
     problem: StoredProblem | null;
     testCases: StoredTestCase[];
 }
 
 /**
- * Version 1 stored the rendered problem markup and read the test cases straight out of the DOM.
- * Anything persisted by that version is upgraded here so an existing workspace keeps its cases.
+ * Version 1 stored the rendered problem markup and read the test cases straight out of
+ * the DOM. Version 2 added a home screen and a pair of tabs, neither of which exists now
+ * that the runner is a panel and the statement is an editor tab. Everything persisted by
+ * either is upgraded here so a workspace keeps its cases across the change.
  */
 export function migrateState(raw: unknown): WorkspaceState | null {
     if (!raw || typeof raw !== "object") {
@@ -33,7 +34,7 @@ export function migrateState(raw: unknown): WorkspaceState | null {
 
     const candidate = raw as Record<string, any>;
 
-    if (candidate.version === STATE_VERSION) {
+    if (candidate.version === STATE_VERSION || candidate.version === 2) {
         return normalize(candidate);
     }
 
@@ -42,15 +43,18 @@ export function migrateState(raw: unknown): WorkspaceState | null {
     }
 
     return normalize({
-        version: STATE_VERSION,
-        view: "workspace",
-        tab: candidate.tab,
-        mode: candidate.interactive ? "interactive" : "standard",
+        tab: candidate.interactive ? "interactive" : "runner",
         problem: candidate.problemHtml
             ? { title: "", timeLimit: "", memoryLimit: "", html: candidate.problemHtml }
             : null,
         testCases: candidate.testCases
     });
+}
+
+/** A version 1 session recorded interactive as a flag rather than a tab. */
+function readTab(candidate: Record<string, any>): WorkspaceState["tab"] {
+    const tab = candidate.mode === "interactive" ? "interactive" : candidate.tab;
+    return tab === "interactive" || tab === "problem" ? tab : "runner";
 }
 
 function normalize(candidate: Record<string, any>): WorkspaceState {
@@ -64,9 +68,7 @@ function normalize(candidate: Record<string, any>): WorkspaceState {
 
     return {
         version: STATE_VERSION,
-        view: candidate.view === "home" ? "home" : "workspace",
-        tab: candidate.tab === "problem" ? "problem" : "runner",
-        mode: candidate.mode === "interactive" ? "interactive" : "standard",
+        tab: readTab(candidate),
         problem: candidate.problem?.html
             ? {
                 title: candidate.problem.title ?? "",

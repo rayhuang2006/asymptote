@@ -2,24 +2,28 @@
     'use strict';
 
     const vscode = acquireVsCodeApi();
-    const STATE_VERSION = 2;
+    const STATE_VERSION = 3;
     const SAVE_DEBOUNCE_MS = 400;
 
     /**
      * The single source of truth for the panel. Everything on screen is rendered
      * from here, and nothing is ever read back out of the DOM.
      */
+    const TABS = ['runner', 'interactive', 'problem'];
+
     const state = {
-        view: 'home',
         hasSession: false,
+        /** The runner opens first: it works without importing anything. */
         tab: 'runner',
-        mode: 'standard',
         problem: null,
         cases: []
     };
 
     /** Run outcomes live for the session only; they are never persisted. */
     const results = new Map();
+
+    /** True while the reader is typing a URL. Not part of the saved session. */
+    let importing = false;
 
     let saveTimer;
     let activeInputRow = null;
@@ -32,13 +36,15 @@
 
     function cacheElements() {
         [
-            'home-view', 'workspace-view', 'main-menu', 'parse-ui', 'parse-error',
-            'problem-url', 'fetchBtn', 'btn-resume', 'problem-content', 'problem-meta',
-            'test-cases-container', 'cases-empty', 'runBtn', 'runner-error',
-            'runner-error-title', 'runner-error-body', 'standard-runner', 'interactive-runner',
-            'mode-standard', 'mode-interactive', 'chat-history',
-            'interactiveStartBtn', 'interactiveStopBtn',
-            'tab-btn-problem', 'tab-btn-runner', 'content-problem', 'content-runner'
+            'tab-runner', 'tab-interactive', 'tab-problem',
+            'panel-runner', 'panel-interactive', 'panel-problem',
+            'statement-title', 'statement-limits', 'statement-empty', 'problem-content',
+            'import-slot', 'btn-cancel-import', 'btn-change-problem',
+            'problem-title', 'problem-meta', 'problem-url', 'fetchBtn',
+            'parse-error', 'verdict-strip', 'run-summary', 'runBtn', 'runBtnLabel',
+            'test-cases-container', 'cases-empty', 'runner-error',
+            'runner-error-title', 'runner-error-body', 'chat-history',
+            'interactiveStartBtn', 'interactiveStopBtn'
         ].forEach((id) => { els[id] = byId(id); });
     }
 
@@ -58,9 +64,7 @@
         }
         return {
             version: STATE_VERSION,
-            view: state.view,
             tab: state.tab,
-            mode: state.mode,
             problem: state.problem,
             testCases: state.cases.map((testCase) => ({
                 id: testCase.id,
@@ -78,10 +82,8 @@
     }
 
     function applyStoredState(stored) {
-        state.view = stored.view === 'home' ? 'home' : 'workspace';
         state.hasSession = true;
-        state.tab = stored.tab || 'runner';
-        state.mode = stored.mode || 'standard';
+        state.tab = TABS.indexOf(stored.tab) >= 0 ? stored.tab : 'runner';
         state.problem = stored.problem || null;
         state.cases = (stored.testCases || []).map((testCase) => ({
             id: testCase.id,
@@ -94,15 +96,28 @@
     /* --- rendering --------------------------------------------------------- */
 
     function render() {
-        toggle(els['home-view'], state.view !== 'home');
-        toggle(els['workspace-view'], state.view !== 'workspace');
-        toggle(els['btn-resume'], !(state.view === 'home' && state.hasSession));
+        renderTabs();
+        renderProblem();
+        renderCases();
+        renderStrip();
+    }
 
-        if (state.view === 'workspace') {
-            renderProblem();
-            renderTabs();
-            renderMode();
-            renderCases();
+    function renderTabs() {
+        TABS.forEach((tab) => {
+            els[`tab-${tab}`].classList.toggle('active', state.tab === tab);
+            toggle(els[`panel-${tab}`], state.tab !== tab);
+        });
+    }
+
+    function setTab(tab) {
+        state.tab = tab;
+        render();
+        persist();
+
+        if (tab === 'runner') {
+            requestAnimationFrame(() => {
+                document.querySelectorAll('#panel-runner textarea').forEach(autoResize);
+            });
         }
     }
 
@@ -114,12 +129,87 @@
 
     function renderProblem() {
         const problem = state.problem;
-        els['problem-content'].innerHTML = problem ? buildProblemMarkup(problem) : '';
+        const named = Boolean(problem && problem.title);
+
+        els['problem-title'].textContent = named ? problem.title : 'No problem imported';
+        els['problem-title'].classList.toggle('placeholder', !named);
         els['problem-meta'].textContent = formatLimits(problem);
 
-        if (problem && window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
+        // The URL box is always there when nothing is imported, and on demand after.
+        toggle(els['import-slot'], Boolean(problem) && !importing);
+        toggle(els['btn-cancel-import'], !problem);
+        toggle(els['btn-change-problem'], !problem);
+
+        renderStatement(problem);
+    }
+
+    /** The statement has something in it only once a problem has been fetched. */
+    function renderStatement(problem) {
+        els['statement-title'].textContent = problem && problem.title ? problem.title : '';
+        els['statement-limits'].textContent = formatLimits(problem);
+        toggle(els['statement-empty'], Boolean(problem));
+        toggle(els['problem-content'], !problem);
+
+        if (!problem) {
+            els['problem-content'].innerHTML = '';
+            els['problem-content'].dataset.rendered = '';
+            return;
         }
+
+        if (els['problem-content'].dataset.rendered !== problem.html) {
+            els['problem-content'].innerHTML = problem.html;
+            els['problem-content'].dataset.rendered = problem.html;
+
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
+            }
+        }
+    }
+
+    /** One segment per case, so a whole run reads at a glance. */
+    function renderStrip() {
+        const strip = els['verdict-strip'];
+        strip.textContent = '';
+
+        state.cases.forEach((testCase, index) => {
+            const result = results.get(testCase.id);
+            const segment = document.createElement('button');
+            segment.className = 'verdict' + (result ? ' ' + result.status : '');
+            segment.title = `#${index + 1}${result ? ' ' + result.status : ''}`;
+            segment.addEventListener('click', () => revealCase(testCase.id));
+            strip.appendChild(segment);
+        });
+
+        els['run-summary'].textContent = summarise();
+    }
+
+    function summarise() {
+        const total = state.cases.length;
+        if (total === 0) {
+            return '';
+        }
+
+        const finished = state.cases.filter((testCase) => {
+            const result = results.get(testCase.id);
+            return result && result.status !== 'RUN';
+        });
+        const passed = finished.filter((testCase) => results.get(testCase.id).status === 'AC').length;
+
+        return finished.length === 0 ? `${total} cases` : `${passed}/${finished.length}`;
+    }
+
+    function revealCase(id) {
+        const node = byId(id);
+        if (!node) {
+            return;
+        }
+        const result = results.get(id) || {};
+        if (result.collapsed) {
+            result.collapsed = false;
+            results.set(id, result);
+            render();
+        }
+        node.scrollIntoView({ block: 'nearest' });
     }
 
     /** Scrapers report "Unknown" when a site does not publish limits; saying so twice is noise. */
@@ -130,40 +220,6 @@
         const limits = [problem.timeLimit, problem.memoryLimit]
             .filter((limit) => limit && limit.toLowerCase() !== 'unknown');
         return limits.join(' / ');
-    }
-
-    function buildProblemMarkup(problem) {
-        if (!problem.title) {
-            return problem.html;
-        }
-
-        const limits = formatLimits(problem);
-        return '<h2 class="problem-title">' + escapeHtml(problem.title) + '</h2>' +
-            (limits ? '<p class="problem-limits">' + escapeHtml(limits) + '</p>' : '') +
-            problem.html;
-    }
-
-    function escapeHtml(value) {
-        return String(value === undefined || value === null ? '' : value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    function renderTabs() {
-        els['tab-btn-problem'].classList.toggle('active', state.tab === 'problem');
-        els['tab-btn-runner'].classList.toggle('active', state.tab === 'runner');
-        toggle(els['content-problem'], state.tab !== 'problem');
-        toggle(els['content-runner'], state.tab !== 'runner');
-    }
-
-    function renderMode() {
-        const interactive = state.mode === 'interactive';
-        els['mode-standard'].classList.toggle('active', !interactive);
-        els['mode-interactive'].classList.toggle('active', interactive);
-        toggle(els['standard-runner'], interactive);
-        toggle(els['interactive-runner'], !interactive);
     }
 
     function renderCases() {
@@ -208,13 +264,19 @@
                 '</div>' +
             '</div>' +
             '<div class="case-body">' +
-                '<span class="label">Input</span><textarea class="input-box" rows="2"></textarea>' +
-                '<span class="label">Expected</span><textarea class="expected-box" rows="2"></textarea>' +
-                '<div class="case-output">' +
-                    '<span class="label">Actual</span>' +
-                    '<textarea class="output-box" rows="2" readonly placeholder="waiting..."></textarea>' +
+                '<div class="case-column">' +
+                    '<span class="label">Input</span>' +
+                    '<textarea class="input-box" rows="1"></textarea>' +
                 '</div>' +
-                '<div class="case-diff hidden"></div>' +
+                '<div class="case-column">' +
+                    '<span class="label">Expected</span>' +
+                    '<textarea class="expected-box" rows="1"></textarea>' +
+                '</div>' +
+                '<div class="case-column case-output">' +
+                    '<span class="label">Actual</span>' +
+                    '<textarea class="output-box" rows="1" readonly placeholder="waiting..."></textarea>' +
+                '</div>' +
+                '<div class="case-column case-diff hidden"></div>' +
             '</div>';
 
         const inputBox = node.querySelector('.input-box');
@@ -353,22 +415,27 @@
 
     function appendDiffRows(table, row) {
         if (row.type === 'same') {
-            table.appendChild(buildDiffRow('same', row.expectedLine, ' ', row.expected));
+            table.appendChild(buildDiffRow('same', row.expectedLine, '', row.expected));
             return;
         }
         if (row.type === 'changed') {
-            table.appendChild(buildDiffRow('removed', row.expectedLine, '-', row.expected));
-            table.appendChild(buildDiffRow('added', row.actualLine, '+', row.actual));
+            table.appendChild(buildDiffRow('expected', row.expectedLine, 'expected', row.expected));
+            table.appendChild(buildDiffRow('wrong', row.actualLine, 'got', row.actual));
             return;
         }
         if (row.type === 'missing') {
-            table.appendChild(buildDiffRow('removed', row.expectedLine, '-', row.expected));
+            table.appendChild(buildDiffRow('expected', row.expectedLine, 'expected', row.expected));
+            table.appendChild(buildDiffRow('wrong', null, 'missing', ''));
             return;
         }
-        table.appendChild(buildDiffRow('added', row.actualLine, '+', row.actual));
+        table.appendChild(buildDiffRow('wrong', row.actualLine, 'extra', row.actual));
     }
 
-    function buildDiffRow(kind, lineNumber, marker, text) {
+    /**
+     * The sides are named rather than marked. A plus and a minus cannot be told
+     * apart from the sign of a number, and competitive output is full of negatives.
+     */
+    function buildDiffRow(kind, lineNumber, label, text) {
         const line = document.createElement('div');
         line.className = 'diff-line ' + kind;
 
@@ -376,16 +443,16 @@
         gutter.className = 'diff-gutter';
         gutter.textContent = lineNumber === null ? '' : String(lineNumber);
 
-        const sign = document.createElement('span');
-        sign.className = 'diff-sign';
-        sign.textContent = marker;
+        const side = document.createElement('span');
+        side.className = 'diff-side';
+        side.textContent = label;
 
         const content = document.createElement('span');
         content.className = 'diff-text';
         appendTextWithVisibleSpaces(content, text);
 
         line.appendChild(gutter);
-        line.appendChild(sign);
+        line.appendChild(side);
         line.appendChild(content);
         return line;
     }
@@ -484,7 +551,7 @@
 
     function setRunning(isRunning, label) {
         els['runBtn'].disabled = isRunning;
-        els['runBtn'].textContent = isRunning ? (label || 'Running...') : 'Run All';
+        els['runBtnLabel'].textContent = isRunning ? (label || 'Running') : 'Run';
     }
 
     function showRunnerError(title, output) {
@@ -498,21 +565,25 @@
         els['runner-error-body'].textContent = '';
     }
 
-    function showParseUI() {
-        toggle(els['main-menu'], true);
-        toggle(els['parse-ui'], false);
-        toggle(els['parse-error'], true);
-    }
-
-    function hideParseUI() {
-        toggle(els['parse-ui'], true);
-        toggle(els['main-menu'], false);
-        setFetching(false);
-    }
-
     function setFetching(isFetching) {
         els['fetchBtn'].disabled = isFetching;
-        els['fetchBtn'].textContent = isFetching ? 'Fetching...' : 'Fetch';
+        els['fetchBtn'].textContent = isFetching ? 'Importing...' : 'Import';
+    }
+
+    /** Reveals the URL box without discarding what is already loaded. */
+    function showImport() {
+        importing = true;
+        setTab('runner');
+        toggle(els['parse-error'], true);
+        render();
+        els['problem-url'].focus();
+        els['problem-url'].select();
+    }
+
+    function cancelImport() {
+        importing = false;
+        toggle(els['parse-error'], true);
+        render();
     }
 
     function startParsing() {
@@ -525,11 +596,9 @@
         vscode.postMessage({ command: 'parse-url', url });
     }
 
-    function openWorkspace(problem, testCases) {
-        state.view = 'workspace';
+    function openProblem(problem, testCases) {
+        importing = false;
         state.hasSession = true;
-        state.tab = problem ? 'problem' : 'runner';
-        state.mode = 'standard';
         state.problem = problem;
         state.cases = (testCases && testCases.length > 0)
             ? testCases.map((testCase) => createCase(testCase.input, testCase.expected))
@@ -538,31 +607,9 @@
         hideRunnerError();
         render();
         persist();
-    }
-
-    /** Going home only navigates; the session stays on disk and can be resumed. */
-    function goHome() {
-        state.view = 'home';
-        hideParseUI();
-        render();
-        persist();
-    }
-
-    function setTab(tab) {
-        state.tab = tab;
-        render();
-        if (tab === 'runner') {
-            requestAnimationFrame(() => {
-                document.querySelectorAll('#standard-runner textarea').forEach(autoResize);
-            });
-        }
-        persist();
-    }
-
-    function setMode(mode) {
-        state.mode = mode;
-        render();
-        persist();
+        requestAnimationFrame(() => {
+            document.querySelectorAll('#standard-runner textarea').forEach(autoResize);
+        });
     }
 
     /* --- interactive ------------------------------------------------------- */
@@ -678,7 +725,7 @@
         },
         'problem-loaded': (msg) => {
             setFetching(false);
-            openWorkspace(msg.problem, msg.testCases);
+            openProblem(msg.problem, msg.testCases);
         },
         'status': (msg) => {
             if (msg.scope === 'fetch') {
@@ -713,6 +760,12 @@
             render();
         },
         'finished': () => setRunning(false),
+        'run-all': () => runCases(null),
+        'add-case': () => {
+            setTab('runner');
+            addCase();
+        },
+        'import-problem': () => showImport(),
         'interactive-stdout': (msg) => appendMessage('solver', msg.data),
         'interactive-stderr': (msg) => appendMessage('error', msg.data),
         'interactive-system': (msg) => appendMessage('system', msg.value),
@@ -734,29 +787,24 @@
     /* --- wiring ------------------------------------------------------------ */
 
     function wire() {
-        byId('btn-import-url').addEventListener('click', showParseUI);
-        byId('btn-manual-create').addEventListener('click', () => openWorkspace(null, []));
-        byId('btn-cancel-parse').addEventListener('click', hideParseUI);
         byId('fetchBtn').addEventListener('click', startParsing);
         byId('problem-url').addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 startParsing();
             }
         });
-        byId('btn-resume').addEventListener('click', () => {
-            state.view = 'workspace';
-            render();
-            persist();
+        TABS.forEach((tab) => byId(`tab-${tab}`).addEventListener('click', () => setTab(tab)));
+        byId('btn-go-import').addEventListener('click', showImport);
+        byId('btn-change-problem').addEventListener('click', showImport);
+        byId('btn-cancel-import').addEventListener('click', cancelImport);
+        byId('problem-url').addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                cancelImport();
+            }
         });
 
-        byId('btn-gohome').addEventListener('click', goHome);
-        byId('tab-btn-problem').addEventListener('click', () => setTab('problem'));
-        byId('tab-btn-runner').addEventListener('click', () => setTab('runner'));
-        byId('mode-standard').addEventListener('click', () => setMode('standard'));
-        byId('mode-interactive').addEventListener('click', () => setMode('interactive'));
-
-        byId('btn-add-case').addEventListener('click', () => addCase());
         byId('runBtn').addEventListener('click', () => runCases(null));
+        byId('btn-add-case').addEventListener('click', () => addCase());
         byId('btn-copy-error').addEventListener('click', () => {
             vscode.postMessage({ command: 'copy', text: els['runner-error-body'].textContent });
         });

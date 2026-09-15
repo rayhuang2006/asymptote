@@ -9,6 +9,16 @@ describe('Webview state migration', () => {
         assert.strictEqual(migrateState('not-an-object'), null);
     });
 
+    it('opens the runner for a session that predates the tabs', () => {
+        const migrated = migrateState({
+            view: 'workspace',
+            interactive: false,
+            testCases: [{ id: 'case-1', input: '1', expected: '1' }]
+        });
+
+        assert.strictEqual(migrated!.tab, 'runner');
+    });
+
     it('upgrades a version 1 session and keeps its test cases', () => {
         const migrated = migrateState({
             view: 'workspace',
@@ -20,23 +30,36 @@ describe('Webview state migration', () => {
 
         assert.ok(migrated);
         assert.strictEqual(migrated!.version, STATE_VERSION);
-        assert.strictEqual(migrated!.view, 'workspace');
-        assert.strictEqual(migrated!.tab, 'problem');
-        assert.strictEqual(migrated!.mode, 'interactive');
+        assert.strictEqual(migrated!.tab, 'interactive');
         assert.strictEqual(migrated!.problem?.html, '<p>statement</p>');
         assert.deepStrictEqual(migrated!.testCases, [{ id: 'case-1', input: '8', expected: 'YES' }]);
+    });
+
+    it('upgrades a version 2 session, keeping the tab it was left on', () => {
+        const migrated = migrateState({
+            version: 2,
+            view: 'workspace',
+            tab: 'problem',
+            mode: 'standard',
+            problem: { title: 'A', timeLimit: '1 second', memoryLimit: '64 MB', html: '<p>a</p>' },
+            testCases: [{ id: 'case-1', input: '8', expected: 'YES' }]
+        });
+
+        assert.strictEqual(migrated!.version, STATE_VERSION);
+        assert.ok(!('view' in migrated!), 'the home screen is gone');
+        assert.strictEqual(migrated!.tab, 'problem', 'the reader was on the statement');
+        assert.strictEqual(migrated!.problem?.title, 'A');
+        assert.strictEqual(migrated!.testCases.length, 1);
     });
 
     it('drops a version 1 session that never reached the workspace', () => {
         assert.strictEqual(migrateState({ view: 'home', testCases: [] }), null);
     });
 
-    it('keeps a version 2 session as it was stored', () => {
+    it('keeps a current session as it was stored', () => {
         const stored = {
             version: STATE_VERSION,
-            view: 'home',
-            tab: 'runner',
-            mode: 'standard',
+            tab: 'runner' as const,
             problem: { title: 'A', timeLimit: '1 second', memoryLimit: '256 MB', html: '<p>a</p>' },
             testCases: [{ id: 'case-1', input: '1', expected: '1' }]
         };
@@ -56,11 +79,10 @@ describe('Webview state migration', () => {
         ]);
     });
 
-    it('falls back to the runner tab and standard mode for unknown values', () => {
-        const migrated = migrateState({ version: STATE_VERSION, tab: 'nope', mode: 'nope' });
+    it('falls back to the runner for an unknown tab', () => {
+        const migrated = migrateState({ version: STATE_VERSION, tab: 'nope' });
 
         assert.strictEqual(migrated!.tab, 'runner');
-        assert.strictEqual(migrated!.mode, 'standard');
         assert.strictEqual(migrated!.problem, null);
     });
 });

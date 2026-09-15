@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getWebviewHtml } from '../webview/WebviewHtml';
+import { STATE_VERSION } from '../webview/WorkspaceState';
 
 const READY_TIMEOUT_MS = 10000;
 
@@ -98,7 +99,7 @@ suite('Webview', () => {
             });
 
             const state = await saved;
-            assert.strictEqual(state.version, 2);
+            assert.strictEqual(state.version, STATE_VERSION);
             assert.strictEqual(state.problem.title, 'A. Watermelon');
             assert.strictEqual(state.testCases.length, 1);
             assert.strictEqual(state.testCases[0].input, '8');

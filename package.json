@@ -37,7 +37,7 @@
         {
           "type": "webview",
           "id": "asymptote-sidebar",
-          "name": "Asymptote Runner",
+          "name": "Runner",
           "icon": "media/icon.svg",
           "contextualTitle": "Asymptote"
         }
@@ -50,8 +50,23 @@
       },
       {
         "command": "asymptote.openRunner",
-        "title": "Open Asymptote Runner",
+        "title": "Asymptote: Open Runner",
         "icon": "media/icon.svg"
+      },
+      {
+        "command": "asymptote.importProblem",
+        "title": "Import Problem",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "asymptote.runAll",
+        "title": "Run All Test Cases",
+        "icon": "$(play)"
+      },
+      {
+        "command": "asymptote.addCase",
+        "title": "Add Test Case",
+        "icon": "$(add)"
       },
       {
         "command": "asymptote.toggleCodeLens",
@@ -63,6 +78,33 @@
         {
           "command": "asymptote.openRunner",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "asymptote.runAll",
+          "when": "view == asymptote-sidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "asymptote.addCase",
+          "when": "view == asymptote-sidebar",
+          "group": "navigation@2"
+        },
+        {
+          "command": "asymptote.importProblem",
+          "when": "view == asymptote-sidebar",
+          "group": "navigation@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "asymptote.runAll",
+          "when": "false"
+        },
+        {
+          "command": "asymptote.addCase",
+          "when": "false"
         }
       ]
     },

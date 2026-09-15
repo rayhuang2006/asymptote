@@ -72,7 +72,7 @@ body {
 .stack-tight {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
 }
 
 /* --- Buttons --------------------------------------------------------------- */
@@ -129,15 +129,18 @@ body {
     background-color: var(--asym-hover);
 }
 
-.btn-dashed {
+.btn-quiet {
+    align-self: flex-start;
+    width: auto;
+    padding: var(--sp-1) var(--sp-2);
     background: transparent;
-    color: var(--asym-accent);
-    border: 1px dashed var(--asym-border);
+    color: var(--asym-muted);
+    border: none;
     font-weight: 500;
 }
 
-.btn-dashed:hover:not(:disabled) {
-    border-color: var(--asym-accent);
+.btn-quiet:hover:not(:disabled) {
+    color: var(--asym-accent);
     background-color: var(--asym-hover);
 }
 
@@ -176,39 +179,244 @@ body {
     fill: currentColor;
 }
 
-/* --- Home ------------------------------------------------------------------ */
+/* --- Tabs and panels ------------------------------------------------------ */
 
-.home {
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    padding: var(--sp-5) var(--sp-4);
-    text-align: center;
+.tabs {
+    flex: none;
+    display: flex;
+    border-bottom: 1px solid var(--asym-border);
 }
 
-.home-logo {
+.tab {
+    flex: 1;
+    padding: var(--sp-2) 0;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--asym-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.tab:hover {
     color: var(--asym-fg);
+    background-color: var(--asym-hover);
 }
 
-.home-logo svg {
-    width: 56px;
-    height: 56px;
-}
-
-.home-title {
-    margin: 0 0 var(--sp-4);
-    font-size: var(--fs-xl);
-    font-weight: 700;
-    letter-spacing: 1px;
+.tab.active {
+    color: var(--vscode-panelTitle-activeForeground, var(--asym-fg));
+    border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--asym-accent));
 }
 
 .panel {
-    padding: var(--sp-3);
-    background-color: var(--asym-raised);
-    border: 1px solid var(--asym-border);
-    border-radius: var(--radius-lg);
-    text-align: left;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
+
+.panel.interactive,
+#panel-interactive {
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
+    gap: var(--sp-2);
+}
+
+/* --- Statement ------------------------------------------------------------ */
+
+.statement-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--sp-3);
+}
+
+.statement-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+}
+
+.statement-title {
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-xl);
+    font-weight: 600;
+}
+
+.statement-title:empty {
+    display: none;
+}
+
+.statement-limits {
+    margin: 0 0 var(--sp-3);
+    padding-bottom: var(--sp-2);
+    font-size: var(--fs-sm);
+    color: var(--asym-muted);
+    border-bottom: 1px solid var(--asym-border);
+}
+
+.statement-limits:empty {
+    display: none;
+}
+
+/* --- Summary -------------------------------------------------------------- */
+
+body {
+    padding: 0;
+}
+
+/* Two rows with fixed roles: what is loaded, then how it did. Nothing wraps, so
+   nothing moves when a title gets longer. */
+.summary {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-3);
+}
+
+.summary-line {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-width: 0;
+}
+
+.problem-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.problem-title.placeholder {
+    font-weight: 400;
+    color: var(--asym-muted);
+}
+
+.problem-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--fs-sm);
+    color: var(--asym-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.run-summary {
+    flex: none;
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--asym-muted);
+}
+
+/* One segment per case, spanning the panel: the run reads in a glance. */
+.verdict-strip {
+    display: flex;
+    gap: 2px;
+    height: 3px;
+}
+
+.verdict-strip:empty {
+    display: none;
+}
+
+.verdict {
+    flex: 1;
+    height: 3px;
+    min-width: 3px;
+    padding: 0;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    background-color: var(--asym-muted);
+    opacity: 0.35;
+    transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+
+.verdict:hover {
+    opacity: 1;
+}
+
+.verdict.RUN {
+    background-color: var(--asym-warn);
+    opacity: 1;
+}
+
+.verdict.AC {
+    background-color: var(--asym-pass);
+    opacity: 1;
+}
+
+.verdict.WA,
+.verdict.RE,
+.verdict.TLE {
+    background-color: var(--asym-fail);
+    opacity: 1;
+}
+
+/* Running is what the panel is for, so it takes the panel's width, the way a
+   sidebar's primary action does. Adding a case is not its peer: it belongs to the
+   list, and sits at the end of it. */
+.btn-run {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    margin: 0 var(--sp-3) var(--sp-2);
+    width: auto;
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--fs-lg);
+}
+
+.btn-run svg {
+    width: 11px;
+    height: 11px;
+    fill: currentColor;
+}
+
+.case-add {
+    width: 100%;
+    padding: var(--sp-2);
+    font-family: inherit;
+    font-size: var(--fs-md);
+    color: var(--asym-muted);
+    text-align: left;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--asym-border);
+    cursor: pointer;
+}
+
+.case-add:hover {
+    color: var(--asym-accent);
+    background-color: var(--asym-hover);
+}
+
+.import-slot {
+    flex: none;
+    display: flex;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-3) var(--sp-2);
+}
+
+.import-slot .btn {
+    width: auto;
+    flex: none;
+    white-space: nowrap;
+}
+
+/* --- Forms and small type -------------------------------------------------- */
 
 .field {
     display: flex;
@@ -218,10 +426,8 @@ body {
 
 .field-label,
 .label {
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     color: var(--asym-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .text-input {
@@ -248,109 +454,10 @@ body {
 }
 
 .empty-state {
-    margin: var(--sp-4) 0;
+    margin: var(--sp-3) 0;
     font-size: var(--fs-md);
     color: var(--asym-muted);
     text-align: center;
-}
-
-/* --- Workspace chrome ------------------------------------------------------ */
-
-.workspace-header {
-    flex: none;
-    background-color: var(--asym-surface);
-    border-bottom: 1px solid var(--asym-border);
-}
-
-.nav-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    border-bottom: 1px solid var(--asym-border);
-}
-
-.back-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
-    padding: 0;
-    font-family: inherit;
-    font-size: var(--fs-md);
-    color: var(--asym-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-
-.back-btn:hover {
-    color: var(--asym-fg);
-}
-
-.back-btn svg {
-    width: 12px;
-    height: 12px;
-    fill: currentColor;
-}
-
-.nav-meta {
-    margin-left: auto;
-    font-size: var(--fs-sm);
-    color: var(--asym-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tabs {
-    display: flex;
-}
-
-.tab {
-    flex: 1;
-    padding: var(--sp-2) 0;
-    font-family: inherit;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--asym-muted);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: color 0.15s ease, background-color 0.15s ease;
-}
-
-.tab:hover {
-    color: var(--asym-fg);
-    background-color: var(--asym-hover);
-}
-
-.tab.active {
-    color: var(--vscode-panelTitle-activeForeground, var(--asym-fg));
-    border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--asym-accent));
-}
-
-.content-area {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: var(--sp-3);
-}
-
-.content-area.runner {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-}
-
-.runner-pane {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
 }
 
 .runner-actions {
@@ -360,56 +467,11 @@ body {
     margin-top: var(--sp-2);
 }
 
-/* --- Mode switch ----------------------------------------------------------- */
-
-.mode-switch {
-    flex: none;
-    display: flex;
-    padding: 2px;
-    background-color: var(--asym-raised);
-    border: 1px solid var(--asym-border);
-    border-radius: var(--radius-md);
-}
-
-.mode-option {
-    flex: 1;
-    padding: var(--sp-1) var(--sp-2);
-    font-family: inherit;
-    font-size: var(--fs-md);
-    color: var(--asym-muted);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-.mode-option:hover {
-    color: var(--asym-fg);
-}
-
-.mode-option.active {
-    color: var(--vscode-button-foreground);
-    background-color: var(--vscode-button-background);
-}
-
 /* --- Problem statement ----------------------------------------------------- */
 
 .prose {
     font-size: var(--fs-lg);
     line-height: 1.55;
-}
-
-.problem-title {
-    margin: 0 0 var(--sp-1);
-    font-size: var(--fs-xl);
-}
-
-.problem-limits {
-    margin: 0 0 var(--sp-3);
-    padding-bottom: var(--sp-2);
-    font-size: var(--fs-sm);
-    color: var(--asym-muted);
-    border-bottom: 1px solid var(--asym-border);
 }
 
 .prose h2,
@@ -435,11 +497,13 @@ body {
 
 .test-case {
     overflow: hidden;
+    /* The left edge carries the verdict; nothing else needs an outline. */
+    border-left: 2px solid var(--asym-muted);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.test-case:not(.collapsed) {
     background-color: var(--asym-raised);
-    border: 1px solid var(--asym-border);
-    /* The left edge always carries the verdict, so an unrun case reads as pending, not blank. */
-    border-left: 3px solid var(--asym-muted);
-    border-radius: var(--radius-md);
 }
 
 .test-case.RUN {
@@ -463,13 +527,17 @@ body {
     gap: var(--sp-2);
     padding: var(--sp-1) var(--sp-2);
     font-size: var(--fs-md);
-    font-weight: 600;
     cursor: pointer;
     user-select: none;
 }
 
 .case-header:hover {
     background-color: var(--asym-hover);
+}
+
+.case-number {
+    font-weight: 600;
+    color: var(--asym-muted);
 }
 
 .case-summary {
@@ -492,19 +560,17 @@ body {
 }
 
 .case-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--sp-2) var(--sp-3);
+    padding: 0 var(--sp-2) var(--sp-2) var(--sp-2);
+}
+
+.case-column {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: var(--sp-2);
-    border-top: 1px solid var(--asym-border);
-}
-
-.case-body .label {
-    margin-top: var(--sp-1);
-}
-
-.case-body .label:first-child {
-    margin-top: 0;
+    gap: var(--sp-1);
+    min-width: 0;
 }
 
 .collapsed .case-body {
@@ -542,10 +608,10 @@ textarea {
     box-sizing: border-box;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
-    line-height: 1.4;
+    line-height: 1.45;
     color: var(--vscode-input-foreground);
     background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--asym-border));
+    border: none;
     border-radius: var(--radius-sm);
     resize: none;
     overflow-y: hidden;
@@ -553,6 +619,11 @@ textarea {
 
 textarea:focus {
     outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+textarea[readonly] {
+    color: var(--asym-muted);
 }
 
 /* --- Compile error --------------------------------------------------------- */
@@ -678,11 +749,12 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
+    min-width: 0;
 }
 
 .diff-summary {
     margin: 0;
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     color: var(--asym-muted);
 }
 
@@ -691,9 +763,8 @@ textarea:focus {
     overflow: auto;
     font-family: var(--vscode-editor-font-family);
     font-size: var(--fs-md);
-    line-height: 1.5;
+    line-height: 1.45;
     background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--asym-border));
     border-radius: var(--radius-sm);
 }
 
@@ -703,12 +774,18 @@ textarea:focus {
     white-space: pre;
 }
 
-.diff-line.removed {
+.diff-line.expected {
+    color: var(--asym-fg);
+}
+
+/* Everything tinted is something wrong with the output, which is the only thing
+   the reader is looking for. */
+.diff-line.wrong {
     background-color: var(--vscode-diffEditor-removedTextBackground, rgba(241, 76, 76, 0.16));
 }
 
-.diff-line.added {
-    background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(63, 185, 80, 0.16));
+.diff-line.same {
+    color: var(--asym-muted);
 }
 
 .diff-gutter {
@@ -720,20 +797,19 @@ textarea:focus {
     user-select: none;
 }
 
-.diff-sign {
+.diff-side {
     flex: none;
-    width: 1.2em;
+    width: 5.5em;
+    padding-right: var(--sp-2);
+    font-family: var(--vscode-font-family);
+    font-size: var(--fs-xs);
     color: var(--asym-muted);
-    text-align: center;
+    text-align: right;
     user-select: none;
 }
 
-.diff-line.removed .diff-sign {
+.diff-line.wrong .diff-side {
     color: var(--asym-fail);
-}
-
-.diff-line.added .diff-sign {
-    color: var(--asym-pass);
 }
 
 .diff-whitespace {

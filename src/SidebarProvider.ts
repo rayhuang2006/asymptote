@@ -67,6 +67,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Drives the webview from the view's own title bar, where VS Code puts actions. */
+  public requestRun(): void {
+    this.post({ type: "run-all" });
+  }
+
+  public requestAddCase(): void {
+    this.post({ type: "add-case" });
+  }
+
+  public requestImport(): void {
+    this.post({ type: "import-problem" });
+  }
+
   private loadState(): WorkspaceState | null {
     return migrateState(this.context.workspaceState.get(STATE_KEY));
   }
@@ -76,16 +89,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     try {
       const problem = await this.fetcher.fetch(url);
-      this.post({
-        type: "problem-loaded",
-        problem: {
-          title: problem.title,
-          timeLimit: problem.timeLimit,
-          memoryLimit: problem.memoryLimit,
-          html: problem.htmlContent
-        },
-        testCases: problem.testCases
-      });
+      const stored = {
+        title: problem.title,
+        timeLimit: problem.timeLimit,
+        memoryLimit: problem.memoryLimit,
+        html: problem.htmlContent
+      };
+
+      this.post({ type: "problem-loaded", problem: stored, testCases: problem.testCases });
     } catch (error: any) {
       const reason = error?.message ?? String(error);
       this.post({ type: "status", scope: "fetch", value: "error", message: reason });
