@@ -100,6 +100,31 @@ describe('AtCoder adapter', () => {
     it('does not repeat the samples inside the statement', () => {
         assert.ok(!problem.htmlContent.includes('Sample Input 1'));
     });
+
+    it('rewrites the tags AtCoder uses for inline maths into delimiters', () => {
+        // The site marks inline maths with <var> and configures its own typesetter
+        // to read those; display maths already uses \[ \], which is why only half
+        // of a statement used to render.
+        assert.ok(!problem.htmlContent.includes('<var>'));
+        assert.ok(problem.htmlContent.includes('\\('));
+    });
+
+    it('keeps a comparison inside inline maths from becoming markup', () => {
+        // AtCoder writes <var>0\leq y&lt;H</var>; decoding that and putting it back
+        // unescaped starts a tag and swallows the rest of the sentence.
+        const converted = atcoderAdapter.parse(
+            '<div id="task-statement"><span class="lang-en"><p>if <var>0\\leq y&lt;H</var> then</p></span></div>',
+            url
+        );
+
+        assert.ok(converted.htmlContent.includes('&lt;H'));
+        assert.ok(converted.htmlContent.includes('then'));
+    });
+
+    it('turns an input format block into something a typesetter will read', () => {
+        // A typesetter skips pre, and the input format is maths rather than code.
+        assert.ok(problem.htmlContent.includes('io-format'));
+    });
 });
 
 describe('NCU Online Judge adapter', () => {
