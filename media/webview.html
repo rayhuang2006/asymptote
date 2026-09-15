@@ -18,73 +18,59 @@
     <link href="${styleUri}" rel="stylesheet">
 </head>
 <body>
-    <!-- Two tabs, no home screen. The runner is what opens, because a fresh panel
-         takes typed test cases without importing anything; the statement is a click
-         away and has something in it once a problem has been fetched. -->
+    <!-- Three tabs and no buttons of our own in the header: running and adding live
+         in the view's title bar, which is where the editor puts view actions. -->
     <nav class="tabs" role="tablist">
         <button id="tab-runner" class="tab active" role="tab">Runner</button>
+        <button id="tab-interactive" class="tab" role="tab">Interactive</button>
         <button id="tab-problem" class="tab" role="tab">Problem</button>
     </nav>
 
     <section id="panel-runner" class="panel">
-    <header class="toolbar">
-        <div id="problem-slot" class="problem-slot">
-            <button id="btn-open-statement" class="problem-link" title="Read the statement">
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2H7v12H3.5A1.5 1.5 0 0 1 2 12.5v-9Z"/><path d="M9 2h3.5A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5H9V2Z" opacity="0.55"/></svg>
-                <span id="problem-title">No problem</span>
-            </button>
-            <span id="problem-meta" class="problem-meta"></span>
-        </div>
-
-        <div id="import-slot" class="import-slot hidden">
-            <input type="text" id="problem-url" class="text-input" placeholder="Paste a Codeforces, AtCoder or NCU Online Judge URL" />
-            <button id="fetchBtn" class="btn btn-primary">Import</button>
-            <button id="btn-manual" class="btn btn-ghost">Start empty</button>
-        </div>
-
-        <div id="verdict-strip" class="verdict-strip" aria-label="Test case results"></div>
-        <span id="run-summary" class="run-summary"></span>
-
-        <div class="mode-switch" role="tablist">
-            <button id="mode-standard" class="mode-option active" role="tab">Cases</button>
-            <button id="mode-interactive" class="mode-option" role="tab">Interactive</button>
-        </div>
-
-        <button id="runBtn" class="btn btn-primary btn-run">Run</button>
-    </header>
-
-    <p id="parse-error" class="inline-error hidden"></p>
-
-    <main id="standard-runner" class="runner-pane">
-        <div id="runner-error" class="runner-error hidden">
-            <div class="runner-error-header">
-                <span id="runner-error-title">Compilation failed</span>
-                <button id="btn-copy-error" class="btn-icon" title="Copy">
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
-                </button>
+        <header class="summary">
+            <div class="summary-line">
+                <span id="problem-title" class="problem-title">No problem</span>
+                <span id="problem-meta" class="problem-meta"></span>
+                <span id="run-summary" class="run-summary"></span>
             </div>
-            <pre id="runner-error-body"></pre>
+            <div id="verdict-strip" class="verdict-strip" aria-label="Test case results"></div>
+        </header>
+
+        <div id="import-slot" class="import-slot">
+            <input type="text" id="problem-url" class="text-input" placeholder="Paste a problem URL" />
+            <button id="fetchBtn" class="btn btn-primary">Import</button>
         </div>
+        <p id="parse-error" class="inline-error hidden"></p>
 
-        <div id="test-cases-container" class="stack-tight"></div>
-        <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
-        <button id="btn-add-case" class="btn btn-dashed">+ Add case</button>
-    </main>
+        <div class="runner-pane">
+            <div id="runner-error" class="runner-error hidden">
+                <div class="runner-error-header">
+                    <span id="runner-error-title">Compilation failed</span>
+                    <button id="btn-copy-error" class="btn-icon" title="Copy">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
+                    </button>
+                </div>
+                <pre id="runner-error-body"></pre>
+            </div>
 
-    <main id="interactive-runner" class="runner-pane interactive hidden">
+            <div id="test-cases-container" class="stack-tight"></div>
+            <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
+            <button id="btn-add-case" class="btn btn-quiet">Add case</button>
+        </div>
+    </section>
+
+    <section id="panel-interactive" class="panel hidden">
         <div class="column-header">
             <span class="col">Judge (input)</span>
             <span class="col">Code (output)</span>
         </div>
         <div id="chat-history" class="chat-history">
-            <div class="msg-system">Click Start to launch an interactive session.</div>
+            <div class="msg-system">Start a session to talk to your program.</div>
         </div>
         <div class="runner-actions">
-            <button id="interactiveStartBtn" class="btn btn-primary">Start interactive session</button>
+            <button id="interactiveStartBtn" class="btn btn-primary">Start session</button>
             <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop process</button>
         </div>
-    </main>
-
     </section>
 
     <section id="panel-problem" class="panel hidden">
@@ -94,7 +80,7 @@
             <div id="problem-content" class="prose"></div>
             <div id="statement-empty" class="empty-state">
                 <p>Nothing imported yet.</p>
-                <button id="btn-go-import" class="btn btn-ghost">Import a problem</button>
+                <button id="btn-go-import" class="btn btn-quiet">Import a problem</button>
             </div>
         </div>
     </section>

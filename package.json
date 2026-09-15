@@ -54,6 +54,16 @@
         "icon": "media/icon.svg"
       },
       {
+        "command": "asymptote.runAll",
+        "title": "Run All Test Cases",
+        "icon": "$(play)"
+      },
+      {
+        "command": "asymptote.addCase",
+        "title": "Add Test Case",
+        "icon": "$(add)"
+      },
+      {
         "command": "asymptote.toggleCodeLens",
         "title": "Asymptote: Toggle Complexity Lens"
       }
@@ -63,6 +73,28 @@
         {
           "command": "asymptote.openRunner",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "asymptote.runAll",
+          "when": "view == asymptote-sidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "asymptote.addCase",
+          "when": "view == asymptote-sidebar",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "asymptote.runAll",
+          "when": "false"
+        },
+        {
+          "command": "asymptote.addCase",
+          "when": "false"
         }
       ]
     },

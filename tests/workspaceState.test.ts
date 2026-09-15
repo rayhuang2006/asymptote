@@ -30,7 +30,7 @@ describe('Webview state migration', () => {
 
         assert.ok(migrated);
         assert.strictEqual(migrated!.version, STATE_VERSION);
-        assert.strictEqual(migrated!.mode, 'interactive');
+        assert.strictEqual(migrated!.tab, 'interactive');
         assert.strictEqual(migrated!.problem?.html, '<p>statement</p>');
         assert.deepStrictEqual(migrated!.testCases, [{ id: 'case-1', input: '8', expected: 'YES' }]);
     });
@@ -59,7 +59,6 @@ describe('Webview state migration', () => {
     it('keeps a current session as it was stored', () => {
         const stored = {
             version: STATE_VERSION,
-            mode: 'standard' as const,
             tab: 'runner' as const,
             problem: { title: 'A', timeLimit: '1 second', memoryLimit: '256 MB', html: '<p>a</p>' },
             testCases: [{ id: 'case-1', input: '1', expected: '1' }]
@@ -80,10 +79,9 @@ describe('Webview state migration', () => {
         ]);
     });
 
-    it('falls back to the runner and standard mode for unknown values', () => {
-        const migrated = migrateState({ version: STATE_VERSION, mode: 'nope', tab: 'nope' });
+    it('falls back to the runner for an unknown tab', () => {
+        const migrated = migrateState({ version: STATE_VERSION, tab: 'nope' });
 
-        assert.strictEqual(migrated!.mode, 'standard');
         assert.strictEqual(migrated!.tab, 'runner');
         assert.strictEqual(migrated!.problem, null);
     });

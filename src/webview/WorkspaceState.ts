@@ -15,8 +15,8 @@ export interface StoredTestCase {
 
 export interface WorkspaceState {
     version: number;
-    mode: "standard" | "interactive";
-    tab: "runner" | "problem";
+    /** Interactive is a tab of its own now, so the mode it used to be is gone. */
+    tab: "runner" | "interactive" | "problem";
     problem: StoredProblem | null;
     testCases: StoredTestCase[];
 }
@@ -43,12 +43,18 @@ export function migrateState(raw: unknown): WorkspaceState | null {
     }
 
     return normalize({
-        mode: candidate.interactive ? "interactive" : "standard",
+        tab: candidate.interactive ? "interactive" : "runner",
         problem: candidate.problemHtml
             ? { title: "", timeLimit: "", memoryLimit: "", html: candidate.problemHtml }
             : null,
         testCases: candidate.testCases
     });
+}
+
+/** A version 1 session recorded interactive as a flag rather than a tab. */
+function readTab(candidate: Record<string, any>): WorkspaceState["tab"] {
+    const tab = candidate.mode === "interactive" ? "interactive" : candidate.tab;
+    return tab === "interactive" || tab === "problem" ? tab : "runner";
 }
 
 function normalize(candidate: Record<string, any>): WorkspaceState {
@@ -62,8 +68,7 @@ function normalize(candidate: Record<string, any>): WorkspaceState {
 
     return {
         version: STATE_VERSION,
-        mode: candidate.mode === "interactive" ? "interactive" : "standard",
-        tab: candidate.tab === "problem" ? "problem" : "runner",
+        tab: readTab(candidate),
         problem: candidate.problem?.html
             ? {
                 title: candidate.problem.title ?? "",

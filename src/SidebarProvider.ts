@@ -67,6 +67,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Drives the webview from the view's own title bar, where VS Code puts actions. */
+  public requestRun(): void {
+    this.post({ type: "run-all" });
+  }
+
+  public requestAddCase(): void {
+    this.post({ type: "add-case" });
+  }
+
   private loadState(): WorkspaceState | null {
     return migrateState(this.context.workspaceState.get(STATE_KEY));
   }

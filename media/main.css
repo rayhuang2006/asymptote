@@ -129,7 +129,7 @@ body {
     background-color: var(--asym-hover);
 }
 
-.btn-dashed {
+.btn-quiet {
     align-self: flex-start;
     width: auto;
     padding: var(--sp-1) var(--sp-2);
@@ -139,7 +139,7 @@ body {
     font-weight: 500;
 }
 
-.btn-dashed:hover:not(:disabled) {
+.btn-quiet:hover:not(:disabled) {
     color: var(--asym-accent);
     background-color: var(--asym-hover);
 }
@@ -220,6 +220,12 @@ body {
     flex-direction: column;
 }
 
+.panel.interactive,
+#panel-interactive {
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
+    gap: var(--sp-2);
+}
+
 /* --- Statement ------------------------------------------------------------ */
 
 .statement-body {
@@ -251,130 +257,82 @@ body {
     display: none;
 }
 
-/* --- Toolbar -------------------------------------------------------------- */
+/* --- Summary -------------------------------------------------------------- */
 
 body {
     padding: 0;
 }
 
-.toolbar {
+/* Two rows with fixed roles: what is loaded, then how it did. Nothing wraps, so
+   nothing moves when a title gets longer. */
+.summary {
     flex: none;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
-    border-bottom: 1px solid var(--asym-border);
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-3);
 }
 
-/* In a sidebar the row cannot hold everything, so the strip takes its own line
-   and the controls sit under the problem it describes. */
-.verdict-strip {
-    order: 3;
-}
-
-.run-summary {
-    order: 4;
-}
-
-.mode-switch {
-    order: 5;
-}
-
-.btn-run {
-    order: 6;
-    margin-left: auto;
-}
-
-.problem-slot {
+.summary-line {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
     min-width: 0;
-    flex: 1 1 12rem;
 }
 
-.problem-link {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
+.problem-title {
+    flex: 0 1 auto;
     min-width: 0;
-    padding: 0;
-    font-family: inherit;
     font-size: var(--fs-lg);
     font-weight: 600;
-    color: var(--asym-fg);
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-
-.problem-link svg {
-    flex: none;
-    width: 13px;
-    height: 13px;
-    fill: currentColor;
-    opacity: 0.7;
-}
-
-.problem-link span {
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.problem-link:hover {
-    color: var(--asym-accent);
-}
-
-.problem-link.placeholder {
+.problem-title.placeholder {
     font-weight: 400;
     color: var(--asym-muted);
-    cursor: default;
 }
 
 .problem-meta {
-    flex: none;
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: var(--fs-sm);
     color: var(--asym-muted);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.import-slot {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    flex: 1;
-    min-width: 0;
-    max-width: 34rem;
-}
-
-.import-slot .btn {
-    width: auto;
+.run-summary {
     flex: none;
-    white-space: nowrap;
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--asym-muted);
 }
 
-/* One segment per case: the whole run is legible without scrolling. */
+/* One segment per case, spanning the panel: the run reads in a glance. */
 .verdict-strip {
-    flex: 1 1 6rem;
     display: flex;
-    align-items: center;
-    gap: 3px;
-    min-width: 3rem;
+    gap: 2px;
+    height: 3px;
+}
+
+.verdict-strip:empty {
+    display: none;
 }
 
 .verdict {
     flex: 1;
-    height: 5px;
-    min-width: 4px;
-    max-width: 120px;
+    height: 3px;
+    min-width: 3px;
     padding: 0;
     border: none;
-    border-radius: 3px;
+    border-radius: 2px;
     cursor: pointer;
     background-color: var(--asym-muted);
-    opacity: 0.4;
+    opacity: 0.35;
     transition: opacity 0.12s ease, background-color 0.12s ease;
 }
 
@@ -399,18 +357,17 @@ body {
     opacity: 1;
 }
 
-.run-summary {
+.import-slot {
     flex: none;
-    font-size: var(--fs-sm);
-    color: var(--asym-muted);
-    white-space: nowrap;
+    display: flex;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-3) var(--sp-2);
 }
 
-.btn-run {
+.import-slot .btn {
     width: auto;
     flex: none;
-    padding: var(--sp-1) var(--sp-4);
-    font-size: var(--fs-md);
+    white-space: nowrap;
 }
 
 /* --- Forms and small type -------------------------------------------------- */
@@ -462,40 +419,6 @@ body {
     flex-direction: column;
     gap: var(--sp-2);
     margin-top: var(--sp-2);
-}
-
-/* --- Mode switch ----------------------------------------------------------- */
-
-.mode-switch {
-    flex: none;
-    display: flex;
-    padding: 2px;
-    order: 5;
-    background-color: var(--asym-raised);
-    border: 1px solid var(--asym-border);
-    border-radius: var(--radius-md);
-}
-
-.mode-option {
-    flex: 1;
-    padding: 3px var(--sp-3);
-    font-family: inherit;
-    font-size: var(--fs-md);
-    white-space: nowrap;
-    color: var(--asym-muted);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-.mode-option:hover {
-    color: var(--asym-fg);
-}
-
-.mode-option.active {
-    color: var(--asym-fg);
-    background-color: var(--asym-hover);
 }
 
 /* --- Problem statement ----------------------------------------------------- */
