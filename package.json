@@ -54,6 +54,11 @@
         "icon": "media/icon.svg"
       },
       {
+        "command": "asymptote.importProblem",
+        "title": "Import Problem",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "asymptote.runAll",
         "title": "Run All Test Cases",
         "icon": "$(play)"
@@ -85,6 +90,11 @@
           "command": "asymptote.addCase",
           "when": "view == asymptote-sidebar",
           "group": "navigation@2"
+        },
+        {
+          "command": "asymptote.importProblem",
+          "when": "view == asymptote-sidebar",
+          "group": "navigation@3"
         }
       ],
       "commandPalette": [

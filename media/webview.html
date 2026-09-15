@@ -45,6 +45,9 @@
         <div id="import-slot" class="import-slot">
             <input type="text" id="problem-url" class="text-input" placeholder="Paste a problem URL" />
             <button id="fetchBtn" class="btn btn-primary">Import</button>
+            <button id="btn-cancel-import" class="btn-icon hidden" title="Cancel">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.9 2.1a.5.5 0 0 1 0 .7l-11 11a.5.5 0 0 1-.7-.7l11-11a.5.5 0 0 1 .7 0Z"/><path d="M2.1 2.1a.5.5 0 0 0 0 .7l11 11a.5.5 0 0 0 .7-.7l-11-11a.5.5 0 0 0-.7 0Z"/></svg>
+            </button>
         </div>
         <p id="parse-error" class="inline-error hidden"></p>
 
@@ -81,7 +84,10 @@
 
     <section id="panel-problem" class="panel hidden">
         <div id="statement-body" class="statement-body">
-            <h2 id="statement-title" class="statement-title"></h2>
+            <div class="statement-heading">
+                <h2 id="statement-title" class="statement-title"></h2>
+                <button id="btn-change-problem" class="btn-quiet hidden">Import another</button>
+            </div>
             <p id="statement-limits" class="statement-limits"></p>
             <div id="problem-content" class="prose"></div>
             <div id="statement-empty" class="empty-state">

@@ -76,6 +76,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this.post({ type: "add-case" });
   }
 
+  public requestImport(): void {
+    this.post({ type: "import-problem" });
+  }
+
   private loadState(): WorkspaceState | null {
     return migrateState(this.context.workspaceState.get(STATE_KEY));
   }

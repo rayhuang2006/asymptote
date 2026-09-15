@@ -235,6 +235,13 @@ body {
     padding: var(--sp-3);
 }
 
+.statement-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+}
+
 .statement-title {
     margin: 0 0 var(--sp-1);
     font-size: var(--fs-xl);

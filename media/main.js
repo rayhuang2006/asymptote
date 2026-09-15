@@ -22,6 +22,9 @@
     /** Run outcomes live for the session only; they are never persisted. */
     const results = new Map();
 
+    /** True while the reader is typing a URL. Not part of the saved session. */
+    let importing = false;
+
     let saveTimer;
     let activeInputRow = null;
 
@@ -36,7 +39,8 @@
             'tab-runner', 'tab-interactive', 'tab-problem',
             'panel-runner', 'panel-interactive', 'panel-problem',
             'statement-title', 'statement-limits', 'statement-empty', 'problem-content',
-            'import-slot', 'problem-title', 'problem-meta', 'problem-url', 'fetchBtn',
+            'import-slot', 'btn-cancel-import', 'btn-change-problem',
+            'problem-title', 'problem-meta', 'problem-url', 'fetchBtn',
             'parse-error', 'verdict-strip', 'run-summary', 'runBtn', 'runBtnLabel',
             'test-cases-container', 'cases-empty', 'runner-error',
             'runner-error-title', 'runner-error-body', 'chat-history',
@@ -131,8 +135,10 @@
         els['problem-title'].classList.toggle('placeholder', !named);
         els['problem-meta'].textContent = formatLimits(problem);
 
-        // With nothing imported the URL box takes the place of the problem's details.
-        toggle(els['import-slot'], Boolean(problem));
+        // The URL box is always there when nothing is imported, and on demand after.
+        toggle(els['import-slot'], Boolean(problem) && !importing);
+        toggle(els['btn-cancel-import'], !problem);
+        toggle(els['btn-change-problem'], !problem);
 
         renderStatement(problem);
     }
@@ -214,14 +220,6 @@
         const limits = [problem.timeLimit, problem.memoryLimit]
             .filter((limit) => limit && limit.toLowerCase() !== 'unknown');
         return limits.join(' / ');
-    }
-
-    function escapeHtml(value) {
-        return String(value === undefined || value === null ? '' : value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
     }
 
     function renderCases() {
@@ -572,13 +570,20 @@
         els['fetchBtn'].textContent = isFetching ? 'Importing...' : 'Import';
     }
 
-    /** Puts the import box back, keeping the cases that are already there. */
+    /** Reveals the URL box without discarding what is already loaded. */
     function showImport() {
-        state.problem = null;
+        importing = true;
+        setTab('runner');
         toggle(els['parse-error'], true);
         render();
-        persist();
         els['problem-url'].focus();
+        els['problem-url'].select();
+    }
+
+    function cancelImport() {
+        importing = false;
+        toggle(els['parse-error'], true);
+        render();
     }
 
     function startParsing() {
@@ -592,6 +597,7 @@
     }
 
     function openProblem(problem, testCases) {
+        importing = false;
         state.hasSession = true;
         state.problem = problem;
         state.cases = (testCases && testCases.length > 0)
@@ -759,6 +765,7 @@
             setTab('runner');
             addCase();
         },
+        'import-problem': () => showImport(),
         'interactive-stdout': (msg) => appendMessage('solver', msg.data),
         'interactive-stderr': (msg) => appendMessage('error', msg.data),
         'interactive-system': (msg) => appendMessage('system', msg.value),
@@ -787,9 +794,13 @@
             }
         });
         TABS.forEach((tab) => byId(`tab-${tab}`).addEventListener('click', () => setTab(tab)));
-        byId('btn-go-import').addEventListener('click', () => {
-            setTab('runner');
-            els['problem-url'].focus();
+        byId('btn-go-import').addEventListener('click', showImport);
+        byId('btn-change-problem').addEventListener('click', showImport);
+        byId('btn-cancel-import').addEventListener('click', cancelImport);
+        byId('problem-url').addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                cancelImport();
+            }
         });
 
         byId('runBtn').addEventListener('click', () => runCases(null));
