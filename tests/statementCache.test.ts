@@ -1,6 +1,6 @@
 /// <reference types="mocha" />
 import * as assert from 'assert';
-import { StatementCache, normalize } from '../src/scraper/StatementCache';
+import { PARSER_VERSION, StatementCache, normalize } from '../src/scraper/StatementCache';
 import { ParsedProblem } from '../src/scraper/types';
 
 class FakeMemento {
@@ -29,6 +29,31 @@ describe('Statement cache', () => {
         await cache.set('https://codeforces.com/problemset/problem/4/A', problem('A. Watermelon'));
 
         assert.strictEqual(cache.get('https://codeforces.com/problemset/problem/4/A')!.title, 'A. Watermelon');
+    });
+
+    it('ignores what an older parser remembered', async () => {
+        // A statement outliving the code that produced it means a parser fix never
+        // reaches a problem the reader has already imported.
+        const memento = new FakeMemento();
+        await memento.update('asymptote-statements', {
+            'https://atcoder.jp/x': {
+                parser: PARSER_VERSION - 1,
+                fetchedAt: Date.now(),
+                seq: 1,
+                problem: problem('stale')
+            }
+        });
+
+        assert.strictEqual(new StatementCache(memento as any).get('https://atcoder.jp/x'), undefined);
+    });
+
+    it('ignores what was remembered before parsers were versioned', async () => {
+        const memento = new FakeMemento();
+        await memento.update('asymptote-statements', {
+            'https://atcoder.jp/x': { fetchedAt: Date.now(), seq: 1, problem: problem('ancient') }
+        });
+
+        assert.strictEqual(new StatementCache(memento as any).get('https://atcoder.jp/x'), undefined);
     });
 
     it('has nothing for a URL it has not seen', () => {

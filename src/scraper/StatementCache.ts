@@ -5,7 +5,19 @@ const CACHE_KEY = "asymptote-statements";
 /** Enough for a contest's worth of problems several times over. */
 const MAX_ENTRIES = 60;
 
+/**
+ * Bump this whenever parsing changes what a statement turns into.
+ *
+ * Without it a remembered statement outlives the code that produced it, and a fix
+ * to a parser never reaches the problems a reader has already imported: they keep
+ * being served the version that was wrong.
+ *
+ * 2: AtCoder's <var> became delimiters, and judges' own colours were stripped.
+ */
+export const PARSER_VERSION = 2;
+
 interface CacheEntry {
+    parser?: number;
     fetchedAt: number;
     /**
      * Insertion order. Several problems can be fetched inside the same millisecond,
@@ -26,13 +38,15 @@ export class StatementCache {
     constructor(private readonly memento: vscode.Memento) {}
 
     public get(url: string): ParsedProblem | undefined {
-        return this.load()[normalize(url)]?.problem;
+        const entry = this.load()[normalize(url)];
+
+        return entry?.parser === PARSER_VERSION ? entry.problem : undefined;
     }
 
     public async set(url: string, problem: ParsedProblem): Promise<void> {
         const entries = this.load();
         const seq = Object.values(entries).reduce((highest, entry) => Math.max(highest, entry.seq ?? 0), 0) + 1;
-        entries[normalize(url)] = { fetchedAt: Date.now(), seq, problem };
+        entries[normalize(url)] = { parser: PARSER_VERSION, fetchedAt: Date.now(), seq, problem };
 
         await this.memento.update(CACHE_KEY, trim(entries));
     }

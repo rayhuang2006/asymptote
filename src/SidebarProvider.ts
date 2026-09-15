@@ -7,6 +7,7 @@ import { resolveTimeLimit } from "./runner/timeLimit";
 import { getWebviewHtml } from "./webview/WebviewHtml";
 import { WorkspaceState } from "./webview/WorkspaceState";
 import { SessionStore } from "./webview/SessionStore";
+import { normalize } from "./scraper/StatementCache";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
@@ -118,9 +119,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private async parseUrl(url: string): Promise<void> {
     this.post({ type: "status", scope: "fetch", value: "loading" });
 
+    // Importing the problem that is already loaded means fetch it again: it is the
+    // only way a reader can ask for a statement to be re-read.
+    const loaded = this.loadState()?.problem?.url;
+    const refresh = Boolean(loaded) && normalize(loaded!) === normalize(url);
+
     try {
-      const problem = await this.fetcher.fetch(url);
+      const problem = await this.fetcher.fetch(url, refresh);
       const stored = {
+        url,
         title: problem.title,
         timeLimit: problem.timeLimit,
         memoryLimit: problem.memoryLimit,
