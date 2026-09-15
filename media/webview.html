@@ -18,93 +18,80 @@
     <link href="${styleUri}" rel="stylesheet">
 </head>
 <body>
-    <div id="home-view" class="view home">
-        <div class="home-logo">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M12 20L24 32L12 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-                <path d="M30 44H38C44 44 48 36 52 20" stroke="var(--asym-accent)" stroke-width="4" stroke-linecap="round"/>
-                <path d="M52 20L46 26M52 20L56 26" stroke="var(--asym-accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </div>
-        <h1 class="home-title">ASYMPTOTE</h1>
-
-        <div id="main-menu" class="stack">
-            <button id="btn-import-url" class="btn btn-primary">Import from URL</button>
-            <button id="btn-manual-create" class="btn btn-outline">Manual Create</button>
-            <button id="btn-resume" class="btn btn-ghost hidden">Resume last session</button>
-        </div>
-
-        <div id="parse-ui" class="panel stack hidden">
-            <label class="field">
-                <span class="field-label">Problem URL</span>
-                <input type="text" id="problem-url" class="text-input" placeholder="https://codeforces.com/..." />
-            </label>
-            <button id="fetchBtn" class="btn btn-primary">Fetch</button>
-            <button id="btn-cancel-parse" class="btn btn-ghost">Cancel</button>
-            <p id="parse-error" class="inline-error hidden"></p>
-        </div>
-    </div>
-
-    <div id="workspace-view" class="view workspace hidden">
-        <header class="workspace-header">
-            <div class="nav-bar">
-                <button id="btn-gohome" class="back-btn">
-                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 12L4 8l6-4v8z"/></svg>
-                    Home
-                </button>
-                <span id="problem-meta" class="nav-meta"></span>
-            </div>
-            <nav class="tabs" role="tablist">
-                <button id="tab-btn-problem" class="tab" role="tab">Problem</button>
-                <button id="tab-btn-runner" class="tab active" role="tab">Runner</button>
-            </nav>
+    <!-- One screen. The statement and the verdicts are both always present, because
+         reading the problem and reading the results are not alternatives. -->
+    <section id="statement-region" class="region statement">
+        <header class="problem-header">
+            <button id="btn-toggle-statement" class="disclosure" aria-expanded="true" title="Collapse">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4z"/></svg>
+            </button>
+            <span id="problem-title" class="problem-title">No problem loaded</span>
+            <span id="problem-meta" class="problem-meta"></span>
+            <button id="btn-change-problem" class="btn-icon hidden" title="Import another problem">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 6.3 4h-1.2A5.8 5.8 0 1 1 8 2.2V5l4-3.5L8 -2z"/><path d="M8 0l4 3.5L8 7z"/></svg>
+            </button>
         </header>
 
-        <section id="content-problem" class="content-area hidden">
-            <div id="problem-content" class="prose"></div>
-        </section>
+        <div id="statement-body" class="statement-body">
+            <div id="import-panel" class="import-panel">
+                <label class="field">
+                    <span class="field-label">Problem URL</span>
+                    <input type="text" id="problem-url" class="text-input" placeholder="Codeforces, AtCoder or NCU Online Judge" />
+                </label>
+                <div class="import-actions">
+                    <button id="fetchBtn" class="btn btn-primary">Import</button>
+                    <button id="btn-manual" class="btn btn-ghost">Start empty</button>
+                </div>
+                <p id="parse-error" class="inline-error hidden"></p>
+            </div>
+            <div id="problem-content" class="prose hidden"></div>
+        </div>
+    </section>
 
-        <section id="content-runner" class="content-area runner">
-            <div class="mode-switch" role="tablist">
-                <button id="mode-standard" class="mode-option active" role="tab">Test Cases</button>
-                <button id="mode-interactive" class="mode-option" role="tab">Interactive</button>
+    <div id="divider" class="divider" role="separator" aria-orientation="horizontal" tabindex="0" title="Drag to resize"></div>
+
+    <section id="runner-region" class="region runner">
+        <div class="runner-toolbar">
+            <div id="verdict-strip" class="verdict-strip" aria-label="Test case results"></div>
+            <span id="run-summary" class="run-summary"></span>
+            <button id="runBtn" class="btn btn-primary btn-run">Run</button>
+        </div>
+
+        <div class="mode-switch" role="tablist">
+            <button id="mode-standard" class="mode-option active" role="tab">Test Cases</button>
+            <button id="mode-interactive" class="mode-option" role="tab">Interactive</button>
+        </div>
+
+        <div id="standard-runner" class="runner-pane">
+            <div id="runner-error" class="runner-error hidden">
+                <div class="runner-error-header">
+                    <span id="runner-error-title">Compilation failed</span>
+                    <button id="btn-copy-error" class="btn-icon" title="Copy">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
+                    </button>
+                </div>
+                <pre id="runner-error-body"></pre>
             </div>
 
-            <div id="standard-runner" class="runner-pane">
-                <div id="runner-error" class="runner-error hidden">
-                    <div class="runner-error-header">
-                        <span id="runner-error-title">Compilation failed</span>
-                        <button id="btn-copy-error" class="btn-icon" title="Copy">
-                            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h6a2 2 0 0 1 2 2v6h-1V4a1 1 0 0 0-1-1H4V2Z"/><path d="M2 5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg>
-                        </button>
-                    </div>
-                    <pre id="runner-error-body"></pre>
-                </div>
+            <div id="test-cases-container" class="stack-tight"></div>
+            <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
+            <button id="btn-add-case" class="btn btn-dashed">+ Add case</button>
+        </div>
 
-                <div id="test-cases-container" class="stack-tight"></div>
-                <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
-
-                <div class="runner-actions">
-                    <button id="btn-add-case" class="btn btn-dashed">+ Add Case</button>
-                    <button id="runBtn" class="btn btn-primary">Run All</button>
-                </div>
+        <div id="interactive-runner" class="runner-pane interactive hidden">
+            <div class="column-header">
+                <span class="col">Judge (input)</span>
+                <span class="col">Code (output)</span>
             </div>
-
-            <div id="interactive-runner" class="runner-pane interactive hidden">
-                <div class="column-header">
-                    <span class="col">Judge (input)</span>
-                    <span class="col">Code (output)</span>
-                </div>
-                <div id="chat-history" class="chat-history">
-                    <div class="msg-system">Click Start to launch an interactive session.</div>
-                </div>
-                <div class="runner-actions">
-                    <button id="interactiveStartBtn" class="btn btn-primary">Start Interactive Session</button>
-                    <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop Process</button>
-                </div>
+            <div id="chat-history" class="chat-history">
+                <div class="msg-system">Click Start to launch an interactive session.</div>
             </div>
-        </section>
-    </div>
+            <div class="runner-actions">
+                <button id="interactiveStartBtn" class="btn btn-primary">Start interactive session</button>
+                <button id="interactiveStopBtn" class="btn btn-danger hidden">Stop process</button>
+            </div>
+        </div>
+    </section>
 
     <script nonce="${nonce}" src="${diffUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>

@@ -1,4 +1,4 @@
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export interface StoredProblem {
     title: string;
@@ -15,16 +15,21 @@ export interface StoredTestCase {
 
 export interface WorkspaceState {
     version: number;
-    view: "home" | "workspace";
-    tab: "problem" | "runner";
     mode: "standard" | "interactive";
+    /** Share of the panel given to the statement, as a percentage. */
+    statementRatio: number;
+    statementCollapsed: boolean;
     problem: StoredProblem | null;
     testCases: StoredTestCase[];
 }
 
+const DEFAULT_RATIO = 45;
+
 /**
- * Version 1 stored the rendered problem markup and read the test cases straight out of the DOM.
- * Anything persisted by that version is upgraded here so an existing workspace keeps its cases.
+ * Version 1 stored the rendered problem markup and read the test cases straight out of
+ * the DOM. Version 2 added a home screen and a pair of tabs, both of which the panel no
+ * longer has. Everything persisted by either is upgraded here so a workspace keeps its
+ * cases across the change.
  */
 export function migrateState(raw: unknown): WorkspaceState | null {
     if (!raw || typeof raw !== "object") {
@@ -33,7 +38,7 @@ export function migrateState(raw: unknown): WorkspaceState | null {
 
     const candidate = raw as Record<string, any>;
 
-    if (candidate.version === STATE_VERSION) {
+    if (candidate.version === STATE_VERSION || candidate.version === 2) {
         return normalize(candidate);
     }
 
@@ -42,9 +47,6 @@ export function migrateState(raw: unknown): WorkspaceState | null {
     }
 
     return normalize({
-        version: STATE_VERSION,
-        view: "workspace",
-        tab: candidate.tab,
         mode: candidate.interactive ? "interactive" : "standard",
         problem: candidate.problemHtml
             ? { title: "", timeLimit: "", memoryLimit: "", html: candidate.problemHtml }
@@ -62,11 +64,13 @@ function normalize(candidate: Record<string, any>): WorkspaceState {
         }))
         : [];
 
+    const ratio = Number(candidate.statementRatio);
+
     return {
         version: STATE_VERSION,
-        view: candidate.view === "home" ? "home" : "workspace",
-        tab: candidate.tab === "problem" ? "problem" : "runner",
         mode: candidate.mode === "interactive" ? "interactive" : "standard",
+        statementRatio: Number.isFinite(ratio) && ratio > 0 ? ratio : DEFAULT_RATIO,
+        statementCollapsed: Boolean(candidate.statementCollapsed),
         problem: candidate.problem?.html
             ? {
                 title: candidate.problem.title ?? "",

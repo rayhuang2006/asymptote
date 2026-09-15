@@ -2,7 +2,7 @@
     'use strict';
 
     const vscode = acquireVsCodeApi();
-    const STATE_VERSION = 2;
+    const STATE_VERSION = 3;
     const SAVE_DEBOUNCE_MS = 400;
 
     /**
@@ -10,12 +10,13 @@
      * from here, and nothing is ever read back out of the DOM.
      */
     const state = {
-        view: 'home',
         hasSession: false,
-        tab: 'runner',
         mode: 'standard',
         problem: null,
-        cases: []
+        cases: [],
+        /** Share of the panel given to the statement, as a percentage. */
+        statementRatio: 45,
+        statementCollapsed: false
     };
 
     /** Run outcomes live for the session only; they are never persisted. */
@@ -32,13 +33,14 @@
 
     function cacheElements() {
         [
-            'home-view', 'workspace-view', 'main-menu', 'parse-ui', 'parse-error',
-            'problem-url', 'fetchBtn', 'btn-resume', 'problem-content', 'problem-meta',
-            'test-cases-container', 'cases-empty', 'runBtn', 'runner-error',
+            'statement-region', 'runner-region', 'divider', 'btn-toggle-statement',
+            'problem-title', 'problem-meta', 'btn-change-problem', 'statement-body',
+            'import-panel', 'problem-content', 'problem-url', 'fetchBtn', 'parse-error',
+            'verdict-strip', 'run-summary', 'runBtn',
+            'test-cases-container', 'cases-empty', 'runner-error',
             'runner-error-title', 'runner-error-body', 'standard-runner', 'interactive-runner',
             'mode-standard', 'mode-interactive', 'chat-history',
-            'interactiveStartBtn', 'interactiveStopBtn',
-            'tab-btn-problem', 'tab-btn-runner', 'content-problem', 'content-runner'
+            'interactiveStartBtn', 'interactiveStopBtn'
         ].forEach((id) => { els[id] = byId(id); });
     }
 
@@ -58,9 +60,9 @@
         }
         return {
             version: STATE_VERSION,
-            view: state.view,
-            tab: state.tab,
             mode: state.mode,
+            statementRatio: state.statementRatio,
+            statementCollapsed: state.statementCollapsed,
             problem: state.problem,
             testCases: state.cases.map((testCase) => ({
                 id: testCase.id,
@@ -78,10 +80,10 @@
     }
 
     function applyStoredState(stored) {
-        state.view = stored.view === 'home' ? 'home' : 'workspace';
         state.hasSession = true;
-        state.tab = stored.tab || 'runner';
         state.mode = stored.mode || 'standard';
+        state.statementRatio = typeof stored.statementRatio === 'number' ? stored.statementRatio : 45;
+        state.statementCollapsed = Boolean(stored.statementCollapsed);
         state.problem = stored.problem || null;
         state.cases = (stored.testCases || []).map((testCase) => ({
             id: testCase.id,
@@ -94,16 +96,19 @@
     /* --- rendering --------------------------------------------------------- */
 
     function render() {
-        toggle(els['home-view'], state.view !== 'home');
-        toggle(els['workspace-view'], state.view !== 'workspace');
-        toggle(els['btn-resume'], !(state.view === 'home' && state.hasSession));
+        renderLayout();
+        renderProblem();
+        renderMode();
+        renderCases();
+        renderStrip();
+    }
 
-        if (state.view === 'workspace') {
-            renderProblem();
-            renderTabs();
-            renderMode();
-            renderCases();
-        }
+    function renderLayout() {
+        const statement = els['statement-region'];
+        statement.classList.toggle('collapsed', state.statementCollapsed);
+        statement.style.maxHeight = state.statementCollapsed ? '' : `${state.statementRatio}%`;
+        els['btn-toggle-statement'].setAttribute('aria-expanded', String(!state.statementCollapsed));
+        toggle(els['divider'], state.statementCollapsed);
     }
 
     function toggle(element, hidden) {
@@ -114,12 +119,74 @@
 
     function renderProblem() {
         const problem = state.problem;
-        els['problem-content'].innerHTML = problem ? buildProblemMarkup(problem) : '';
-        els['problem-meta'].textContent = formatLimits(problem);
 
-        if (problem && window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
+        els['problem-title'].textContent = problem && problem.title ? problem.title : 'No problem loaded';
+        els['problem-title'].classList.toggle('placeholder', !(problem && problem.title));
+        els['problem-meta'].textContent = formatLimits(problem);
+        toggle(els['btn-change-problem'], !problem);
+
+        toggle(els['import-panel'], Boolean(problem));
+        toggle(els['problem-content'], !problem);
+
+        if (!problem) {
+            els['problem-content'].innerHTML = '';
+            return;
         }
+
+        if (els['problem-content'].dataset.rendered !== problem.html) {
+            els['problem-content'].innerHTML = problem.html;
+            els['problem-content'].dataset.rendered = problem.html;
+
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([els['problem-content']]).catch(() => { });
+            }
+        }
+    }
+
+    /** One segment per case, so a whole run reads at a glance. */
+    function renderStrip() {
+        const strip = els['verdict-strip'];
+        strip.textContent = '';
+
+        state.cases.forEach((testCase, index) => {
+            const result = results.get(testCase.id);
+            const segment = document.createElement('button');
+            segment.className = 'verdict' + (result ? ' ' + result.status : '');
+            segment.title = `#${index + 1}${result ? ' ' + result.status : ''}`;
+            segment.addEventListener('click', () => revealCase(testCase.id));
+            strip.appendChild(segment);
+        });
+
+        els['run-summary'].textContent = summarise();
+    }
+
+    function summarise() {
+        const total = state.cases.length;
+        if (total === 0) {
+            return '';
+        }
+
+        const finished = state.cases.filter((testCase) => {
+            const result = results.get(testCase.id);
+            return result && result.status !== 'RUN';
+        });
+        const passed = finished.filter((testCase) => results.get(testCase.id).status === 'AC').length;
+
+        return finished.length === 0 ? `${total} cases` : `${passed}/${finished.length}`;
+    }
+
+    function revealCase(id) {
+        const node = byId(id);
+        if (!node) {
+            return;
+        }
+        const result = results.get(id) || {};
+        if (result.collapsed) {
+            result.collapsed = false;
+            results.set(id, result);
+            render();
+        }
+        node.scrollIntoView({ block: 'nearest' });
     }
 
     /** Scrapers report "Unknown" when a site does not publish limits; saying so twice is noise. */
@@ -132,30 +199,12 @@
         return limits.join(' / ');
     }
 
-    function buildProblemMarkup(problem) {
-        if (!problem.title) {
-            return problem.html;
-        }
-
-        const limits = formatLimits(problem);
-        return '<h2 class="problem-title">' + escapeHtml(problem.title) + '</h2>' +
-            (limits ? '<p class="problem-limits">' + escapeHtml(limits) + '</p>' : '') +
-            problem.html;
-    }
-
     function escapeHtml(value) {
         return String(value === undefined || value === null ? '' : value)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
-    }
-
-    function renderTabs() {
-        els['tab-btn-problem'].classList.toggle('active', state.tab === 'problem');
-        els['tab-btn-runner'].classList.toggle('active', state.tab === 'runner');
-        toggle(els['content-problem'], state.tab !== 'problem');
-        toggle(els['content-runner'], state.tab !== 'runner');
     }
 
     function renderMode() {
@@ -484,7 +533,7 @@
 
     function setRunning(isRunning, label) {
         els['runBtn'].disabled = isRunning;
-        els['runBtn'].textContent = isRunning ? (label || 'Running...') : 'Run All';
+        els['runBtn'].textContent = isRunning ? (label || 'Running...') : 'Run';
     }
 
     function showRunnerError(title, output) {
@@ -498,21 +547,19 @@
         els['runner-error-body'].textContent = '';
     }
 
-    function showParseUI() {
-        toggle(els['main-menu'], true);
-        toggle(els['parse-ui'], false);
-        toggle(els['parse-error'], true);
-    }
-
-    function hideParseUI() {
-        toggle(els['parse-ui'], true);
-        toggle(els['main-menu'], false);
-        setFetching(false);
-    }
-
     function setFetching(isFetching) {
         els['fetchBtn'].disabled = isFetching;
-        els['fetchBtn'].textContent = isFetching ? 'Fetching...' : 'Fetch';
+        els['fetchBtn'].textContent = isFetching ? 'Importing...' : 'Import';
+    }
+
+    /** Puts the import form back, keeping the cases that are already there. */
+    function showImport() {
+        state.problem = null;
+        toggle(els['parse-error'], true);
+        state.statementCollapsed = false;
+        render();
+        persist();
+        els['problem-url'].focus();
     }
 
     function startParsing() {
@@ -525,10 +572,8 @@
         vscode.postMessage({ command: 'parse-url', url });
     }
 
-    function openWorkspace(problem, testCases) {
-        state.view = 'workspace';
+    function openProblem(problem, testCases) {
         state.hasSession = true;
-        state.tab = problem ? 'problem' : 'runner';
         state.mode = 'standard';
         state.problem = problem;
         state.cases = (testCases && testCases.length > 0)
@@ -538,24 +583,48 @@
         hideRunnerError();
         render();
         persist();
+        requestAnimationFrame(() => {
+            document.querySelectorAll('#standard-runner textarea').forEach(autoResize);
+        });
     }
 
-    /** Going home only navigates; the session stays on disk and can be resumed. */
-    function goHome() {
-        state.view = 'home';
-        hideParseUI();
+    function toggleStatement() {
+        state.statementCollapsed = !state.statementCollapsed;
         render();
         persist();
     }
 
-    function setTab(tab) {
-        state.tab = tab;
-        render();
-        if (tab === 'runner') {
-            requestAnimationFrame(() => {
-                document.querySelectorAll('#standard-runner textarea').forEach(autoResize);
-            });
-        }
+    /* --- divider ------------------------------------------------------------ */
+
+    const MIN_RATIO = 12;
+    const MAX_RATIO = 85;
+
+    function startDrag(event) {
+        event.preventDefault();
+        els['divider'].classList.add('dragging');
+        els['divider'].setPointerCapture(event.pointerId);
+
+        const move = (moved) => {
+            const bounds = document.body.getBoundingClientRect();
+            const ratio = ((moved.clientY - bounds.top) / bounds.height) * 100;
+            state.statementRatio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio));
+            renderLayout();
+        };
+
+        const stop = () => {
+            els['divider'].classList.remove('dragging');
+            els['divider'].removeEventListener('pointermove', move);
+            els['divider'].removeEventListener('pointerup', stop);
+            persist();
+        };
+
+        els['divider'].addEventListener('pointermove', move);
+        els['divider'].addEventListener('pointerup', stop);
+    }
+
+    function nudgeDivider(delta) {
+        state.statementRatio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, state.statementRatio + delta));
+        renderLayout();
         persist();
     }
 
@@ -678,7 +747,7 @@
         },
         'problem-loaded': (msg) => {
             setFetching(false);
-            openWorkspace(msg.problem, msg.testCases);
+            openProblem(msg.problem, msg.testCases);
         },
         'status': (msg) => {
             if (msg.scope === 'fetch') {
@@ -734,24 +803,23 @@
     /* --- wiring ------------------------------------------------------------ */
 
     function wire() {
-        byId('btn-import-url').addEventListener('click', showParseUI);
-        byId('btn-manual-create').addEventListener('click', () => openWorkspace(null, []));
-        byId('btn-cancel-parse').addEventListener('click', hideParseUI);
         byId('fetchBtn').addEventListener('click', startParsing);
+        byId('btn-manual').addEventListener('click', () => openProblem(null, []));
         byId('problem-url').addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 startParsing();
             }
         });
-        byId('btn-resume').addEventListener('click', () => {
-            state.view = 'workspace';
-            render();
-            persist();
+        byId('btn-change-problem').addEventListener('click', showImport);
+        byId('btn-toggle-statement').addEventListener('click', toggleStatement);
+        byId('problem-title').addEventListener('click', toggleStatement);
+
+        byId('divider').addEventListener('pointerdown', startDrag);
+        byId('divider').addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') { nudgeDivider(-5); }
+            if (event.key === 'ArrowDown') { nudgeDivider(5); }
         });
 
-        byId('btn-gohome').addEventListener('click', goHome);
-        byId('tab-btn-problem').addEventListener('click', () => setTab('problem'));
-        byId('tab-btn-runner').addEventListener('click', () => setTab('runner'));
         byId('mode-standard').addEventListener('click', () => setMode('standard'));
         byId('mode-interactive').addEventListener('click', () => setMode('interactive'));
 
