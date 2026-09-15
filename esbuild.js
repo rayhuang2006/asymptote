@@ -5,18 +5,31 @@ const path = require('path');
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
-/** Reports bundle failures the way the terminal and the problem matcher expect. */
+/**
+ * Reports failures, and brackets each build with the lines the task's problem
+ * matcher watches for. Without them the editor waits forever for a watch task
+ * that never says it has finished.
+ */
 const reportProblems = {
     name: 'report-problems',
     setup(build) {
+        build.onStart(() => {
+            if (watch) {
+                console.log('[watch] build started');
+            }
+        });
+
         build.onEnd((result) => {
             result.errors.forEach(({ text, location }) => {
-                console.error(`✘ ${text}`);
+                console.error(`✘ [ERROR] ${text}`);
                 if (location) {
                     console.error(`    ${location.file}:${location.line}:${location.column}`);
                 }
             });
-            if (result.errors.length === 0) {
+
+            if (watch) {
+                console.log('[watch] build finished');
+            } else if (result.errors.length === 0) {
                 console.log(`build finished${production ? ' (production)' : ''}`);
             }
         });
