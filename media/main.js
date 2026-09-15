@@ -37,7 +37,7 @@
             'panel-runner', 'panel-interactive', 'panel-problem',
             'statement-title', 'statement-limits', 'statement-empty', 'problem-content',
             'import-slot', 'problem-title', 'problem-meta', 'problem-url', 'fetchBtn',
-            'parse-error', 'verdict-strip', 'run-summary',
+            'parse-error', 'verdict-strip', 'run-summary', 'runBtn', 'runBtnLabel',
             'test-cases-container', 'cases-empty', 'runner-error',
             'runner-error-title', 'runner-error-body', 'chat-history',
             'interactiveStartBtn', 'interactiveStopBtn'
@@ -174,7 +174,7 @@
             strip.appendChild(segment);
         });
 
-        els['run-summary'].textContent = runningLabel || summarise();
+        els['run-summary'].textContent = summarise();
     }
 
     function summarise() {
@@ -546,11 +546,9 @@
         });
     }
 
-    let runningLabel = '';
-
     function setRunning(isRunning, label) {
-        runningLabel = isRunning ? (label || 'Running...') : '';
-        els['run-summary'].textContent = runningLabel || summarise();
+        els['runBtn'].disabled = isRunning;
+        els['runBtnLabel'].textContent = isRunning ? (label || 'Running') : 'Run';
     }
 
     function showRunnerError(title, output) {
@@ -789,6 +787,7 @@
             els['problem-url'].focus();
         });
 
+        byId('runBtn').addEventListener('click', () => runCases(null));
         byId('btn-add-case').addEventListener('click', () => addCase());
         byId('btn-copy-error').addEventListener('click', () => {
             vscode.postMessage({ command: 'copy', text: els['runner-error-body'].textContent });

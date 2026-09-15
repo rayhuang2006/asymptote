@@ -34,6 +34,17 @@
                 <span id="run-summary" class="run-summary"></span>
             </div>
             <div id="verdict-strip" class="verdict-strip" aria-label="Test case results"></div>
+
+            <div class="actions">
+                <button id="runBtn" class="btn btn-primary btn-action">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.7v10.6a.6.6 0 0 0 .92.5l8.2-5.3a.6.6 0 0 0 0-1l-8.2-5.3a.6.6 0 0 0-.92.5Z"/></svg>
+                    <span id="runBtnLabel">Run</span>
+                </button>
+                <button id="btn-add-case" class="btn btn-secondary btn-action">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.25 2.75h1.5v4.5h4.5v1.5h-4.5v4.5h-1.5v-4.5h-4.5v-1.5h4.5z"/></svg>
+                    Add case
+                </button>
+            </div>
         </header>
 
         <div id="import-slot" class="import-slot">
@@ -55,7 +66,6 @@
 
             <div id="test-cases-container" class="stack-tight"></div>
             <p id="cases-empty" class="empty-state hidden">No test cases yet.</p>
-            <button id="btn-add-case" class="btn btn-quiet">Add case</button>
         </div>
     </section>
 
