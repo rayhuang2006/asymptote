@@ -4,6 +4,18 @@ All notable changes to the "asymptote" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.7.0](https://github.com/rayhuang2006/asymptote/compare/v0.6.3...v0.7.0) (2026-09-15)
+
+
+### Features
+
+* **webview:** drop the home screen and open the runner first ([#58](https://github.com/rayhuang2006/asymptote/issues/58)) ([6ecc3bd](https://github.com/rayhuang2006/asymptote/commit/6ecc3bde71bba7fa9062cca036d1dac6a0e27c0e))
+
+
+### Bug Fixes
+
+* **dev:** let F5 start the extension again ([#56](https://github.com/rayhuang2006/asymptote/issues/56)) ([91901d3](https://github.com/rayhuang2006/asymptote/commit/91901d3906d5ae542267cd43ac6e63c3a4b8adc0))
+
 ## [0.6.3](https://github.com/rayhuang2006/asymptote/compare/v0.6.2...v0.6.3) (2026-09-12)
 
 
