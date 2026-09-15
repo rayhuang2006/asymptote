@@ -4,6 +4,7 @@ import { fetchText } from "./http";
 import { parseUrl, resolveAdapter } from "./registry";
 import { ParsedProblem } from "./types";
 import { StatementCache } from "./StatementCache";
+import { sanitizeStatement } from "./sanitize";
 
 /**
  * Resolves a pasted URL to a problem, using the cheapest transport the site allows.
@@ -33,7 +34,9 @@ export class ProblemFetcher {
             ? await this.browser().loadHtml(requestUrl, adapter.readySelector)
             : await fetchText(requestUrl);
 
-        const problem = adapter.parse(body, url);
+        const parsed = adapter.parse(body, url);
+        const problem = { ...parsed, htmlContent: sanitizeStatement(parsed.htmlContent) };
+
         await this.cache?.set(url.href, problem);
         return problem;
     }
