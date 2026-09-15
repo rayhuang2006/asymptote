@@ -101,9 +101,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
       this.post({ type: "problem-loaded", problem: stored, testCases: problem.testCases });
 
-      // Importing is the moment the statement is wanted; after that it is the
-      // reader's business whether the tab stays open.
-      StatementPanel.show(this.extensionUri, stored);
+      // Importing does not open the statement: the runner is what the panel is for,
+      // and reading the problem is a click away. An already open statement is kept
+      // current rather than left showing the previous problem.
+      StatementPanel.refresh(stored);
     } catch (error: any) {
       const reason = error?.message ?? String(error);
       this.post({ type: "status", scope: "fetch", value: "error", message: reason });

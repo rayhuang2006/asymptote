@@ -50,10 +50,6 @@ export class StatementPanel {
         StatementPanel.current?.update(problem);
     }
 
-    public static get isOpen(): boolean {
-        return StatementPanel.current !== undefined;
-    }
-
     private update(problem: StoredProblem): void {
         this.panel.title = problem.title || "Problem";
         this.panel.webview.html = getWebviewHtml(
