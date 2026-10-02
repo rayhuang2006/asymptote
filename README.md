@@ -11,6 +11,14 @@
 
 <br />
 
+https://github.com/user-attachments/assets/bdf3bf9e-9ffa-4a82-95f5-942021b8d750
+
+<div align="center">
+  <sub>Music: “Presenterator” by Kevin MacLeod (<a href="https://incompetech.com">incompetech.com</a>), licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</sub>
+</div>
+
+<br />
+
 **Asymptote** is a VS Code extension designed to help competitive programmers visualize the theoretical speed of their code *while typing*. It combines a heuristic complexity analyzer with a robust local test runner. By providing a worst-case estimation instantly, it helps you catch accidental `O(N²)` or `O(2^N)` logic before you even compile.
 
 > **Supported Languages:** C++, Python and Java.
